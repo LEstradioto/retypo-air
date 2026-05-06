@@ -82,8 +82,8 @@ protocol LLMProviderClient {
 
 enum APIKeyStore {
     static func apiKey(for provider: ProviderKind) -> String? {
-        let value = ProcessInfo.processInfo.environment[provider.apiKeyEnvironmentName]
-        let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed?.isEmpty == false ? trimmed : nil
+        guard let raw = getenv(provider.apiKeyEnvironmentName) else { return nil }
+        let value = String(cString: raw).trimmingCharacters(in: .whitespacesAndNewlines)
+        return value.isEmpty ? nil : value
     }
 }

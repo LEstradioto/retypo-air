@@ -1,0 +1,24 @@
+{
+    "configurations": [
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:re-typoer}",
+            "name": "Debug RetypoAir",
+            "target": "RetypoAir",
+            "configuration": "debug",
+            "preLaunchTask": "swift: Build Debug RetypoAir"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:re-typoer}",
+            "name": "Release RetypoAir",
+            "target": "RetypoAir",
+            "configuration": "release",
+            "preLaunchTask": "swift: Build Release RetypoAir"
+        }
+    ]
+}

@@ -7,6 +7,14 @@ Tiny macOS floating text box for drafting agent prompts, correcting typos with a
 Set at least one API key. Default provider is Groq.
 
 ```bash
+cp .env.example .env
+# edit .env and add GROQ_API_KEY or another provider key
+swift run --disable-sandbox RetypoAir
+```
+
+You can also use shell environment variables directly:
+
+```bash
 export GROQ_API_KEY="..."
 swift run --disable-sandbox RetypoAir
 ```
@@ -25,6 +33,15 @@ swift run RetypoAir
 - `Esc`: hide the panel.
 - Auto mode: after you stop typing for 500ms, Retypo corrects and copies automatically.
 - Auto off: Retypo only runs when you press Enter or click a button.
+
+## .env loading
+
+Retypo Air automatically loads:
+
+1. `.env` from the directory where you run `swift run`
+2. `~/.retypo-air/.env`
+
+Existing shell environment variables have priority over `.env` values.
 
 ## Providers
 
