@@ -1,0 +1,77 @@
+import Foundation
+
+final class OpenAICompatibleProvider: LLMProviderClient {
+    let kind: ProviderKind
+    private let baseURL: URL
+    private let extraHeaders: [String: String]
+
+    init(kind: ProviderKind, baseURL: URL, extraHeaders: [String: String] = [:]) {
+        self.kind = kind
+        self.baseURL = baseURL
+        self.extraHeaders = extraHeaders
+    }
+
+    func complete(_ request: LLMRequest, apiKey: String) async throws -> LLMResponse {
+        let url = baseURL.appendingPathComponent("chat/completions")
+        var urlRequest = URLRequest(url: url)
+        urlRequest.httpMethod = "POST"
+        urlRequest.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        for (key, value) in extraHeaders { urlRequest.setValue(value, forHTTPHeaderField: key) }
+
+        let payload: [String: Any] = [
+            "model": request.model,
+            "messages": [
+                ["role": "system", "content": request.system],
+                ["role": "user", "content": request.user]
+            ],
+            "temperature": request.temperature,
+            "max_tokens": request.maxTokens
+        ]
+        urlRequest.httpBody = try JSONSerialization.data(withJSONObject: payload)
+
+        let (data, response) = try await URLSession.shared.data(for: urlRequest)
+        try validate(response: response, data: data)
+        let object = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+        let choices = object?["choices"] as? [[String: Any]]
+        let message = choices?.first?["message"] as? [String: Any]
+        if let text = message?["content"] as? String {
+            return LLMResponse(text: text)
+        }
+        throw LLMError.invalidResponse
+    }
+
+    func listModels(apiKey: String) async throws -> [ProviderModel] {
+        let url = baseURL.appendingPathComponent("models")
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        for (key, value) in extraHeaders { request.setValue(value, forHTTPHeaderField: key) }
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        try validate(response: response, data: data)
+        let object = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+        let dataArray = object?["data"] as? [[String: Any]] ?? []
+        return dataArray.compactMap { item in
+            guard let id = item["id"] as? String else { return nil }
+            let name = item["name"] as? String ?? id
+            let description = item["description"] as? String
+            let context = item["context_length"] as? Int
+                ?? item["contextLength"] as? Int
+            return ProviderModel(id: id, name: name, description: description, contextLength: context)
+        }
+        .filter { model in
+            let id = model.id.lowercased()
+            return !id.contains("embedding") && !id.contains("whisper") && !id.contains("tts") && !id.contains("image") && !id.contains("moderation")
+        }
+        .sorted { $0.id.localizedCaseInsensitiveCompare($1.id) == .orderedAscending }
+    }
+
+    private func validate(response: URLResponse, data: Data) throws {
+        guard let http = response as? HTTPURLResponse else { throw LLMError.invalidResponse }
+        guard (200..<300).contains(http.statusCode) else {
+            let body = String(data: data, encoding: .utf8) ?? ""
+            throw LLMError.badStatus(http.statusCode, body)
+        }
+    }
+}

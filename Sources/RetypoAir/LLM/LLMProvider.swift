@@ -1,0 +1,89 @@
+import Foundation
+
+enum ProviderKind: String, CaseIterable, Identifiable, Codable {
+    case groq
+    case anthropic
+    case openai
+    case openrouter
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .groq: "Groq"
+        case .anthropic: "Anthropic"
+        case .openai: "OpenAI"
+        case .openrouter: "OpenRouter"
+        }
+    }
+
+    var apiKeyEnvironmentName: String {
+        switch self {
+        case .groq: "GROQ_API_KEY"
+        case .anthropic: "ANTHROPIC_API_KEY"
+        case .openai: "OPENAI_API_KEY"
+        case .openrouter: "OPENROUTER_API_KEY"
+        }
+    }
+}
+
+struct ProviderModel: Identifiable, Hashable, Codable {
+    var id: String
+    var name: String
+    var description: String?
+    var contextLength: Int?
+
+    init(id: String, name: String? = nil, description: String? = nil, contextLength: Int? = nil) {
+        self.id = id
+        self.name = name ?? id
+        self.description = description
+        self.contextLength = contextLength
+    }
+}
+
+struct LLMRequest {
+    var provider: ProviderKind
+    var model: String
+    var system: String
+    var user: String
+    var maxTokens: Int = 2_000
+    var temperature: Double = 0.0
+}
+
+struct LLMResponse {
+    var text: String
+}
+
+enum LLMError: LocalizedError {
+    case missingAPIKey(ProviderKind)
+    case missingModel(ProviderKind)
+    case invalidURL
+    case badStatus(Int, String)
+    case invalidResponse
+    case parseFailed(String)
+
+    var errorDescription: String? {
+        switch self {
+        case .missingAPIKey(let provider): "Missing \(provider.apiKeyEnvironmentName)"
+        case .missingModel(let provider): "Select a \(provider.displayName) model first"
+        case .invalidURL: "Invalid API URL"
+        case .badStatus(let code, let body): "API error \(code): \(body.prefix(280))"
+        case .invalidResponse: "Invalid API response"
+        case .parseFailed(let body): "Could not parse response: \(body.prefix(280))"
+        }
+    }
+}
+
+protocol LLMProviderClient {
+    var kind: ProviderKind { get }
+    func complete(_ request: LLMRequest, apiKey: String) async throws -> LLMResponse
+    func listModels(apiKey: String) async throws -> [ProviderModel]
+}
+
+enum APIKeyStore {
+    static func apiKey(for provider: ProviderKind) -> String? {
+        let value = ProcessInfo.processInfo.environment[provider.apiKeyEnvironmentName]
+        let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed?.isEmpty == false ? trimmed : nil
+    }
+}
