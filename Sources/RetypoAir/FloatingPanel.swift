@@ -5,18 +5,23 @@ final class FloatingPanel: NSPanel {
         let rect = settings.panelFrame.nsRect
         super.init(
             contentRect: rect,
-            styleMask: [.titled, .closable, .resizable, .fullSizeContentView],
+            styleMask: [.borderless, .resizable],
             backing: .buffered,
             defer: false
         )
         title = "Retypo Air"
         isFloatingPanel = true
+        hidesOnDeactivate = false
+        isReleasedWhenClosed = false
         level = settings.alwaysOnTop ? .floating : .normal
-        collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
         isMovableByWindowBackground = true
         titlebarAppearsTransparent = true
         titleVisibility = .hidden
-        minSize = NSSize(width: 520, height: 320)
+        minSize = NSSize(width: 280, height: 78)
+        for button in [standardWindowButton(.closeButton), standardWindowButton(.miniaturizeButton), standardWindowButton(.zoomButton)] {
+            button?.isHidden = true
+        }
         backgroundColor = .clear
         isOpaque = false
         hasShadow = true

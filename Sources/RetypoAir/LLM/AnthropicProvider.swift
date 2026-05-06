@@ -26,7 +26,7 @@ final class AnthropicProvider: LLMProviderClient {
         let object = try JSONSerialization.jsonObject(with: data) as? [String: Any]
         let blocks = object?["content"] as? [[String: Any]]
         let text = blocks?.compactMap { $0["text"] as? String }.joined(separator: "")
-        if let text, !text.isEmpty { return LLMResponse(text: text) }
+        if let text, !text.isEmpty { return LLMResponse(text: text, usage: parseUsage(object?["usage"] as? [String: Any])) }
         throw LLMError.invalidResponse
     }
 
@@ -47,6 +47,14 @@ final class AnthropicProvider: LLMProviderClient {
             return ProviderModel(id: id, name: name)
         }
         .sorted { $0.id.localizedCaseInsensitiveCompare($1.id) == .orderedAscending }
+    }
+
+    private func parseUsage(_ usage: [String: Any]?) -> TokenUsage {
+        guard let usage else { return .zero }
+        return TokenUsage(
+            inputTokens: usage["input_tokens"] as? Int ?? 0,
+            outputTokens: usage["output_tokens"] as? Int ?? 0
+        )
     }
 
     private func validate(response: URLResponse, data: Data) throws {

@@ -24,19 +24,30 @@ final class OpenAIResponsesProvider: LLMProviderClient {
         let (data, response) = try await URLSession.shared.data(for: urlRequest)
         try validate(response: response, data: data)
         let object = try JSONSerialization.jsonObject(with: data) as? [String: Any]
-        if let text = object?["output_text"] as? String { return LLMResponse(text: text) }
+        if let text = object?["output_text"] as? String { return LLMResponse(text: text, usage: parseUsage(object?["usage"] as? [String: Any])) }
         if let output = object?["output"] as? [[String: Any]] {
             let text = output.flatMap { item -> [String] in
                 let content = item["content"] as? [[String: Any]] ?? []
                 return content.compactMap { $0["text"] as? String }
             }.joined(separator: "")
-            if !text.isEmpty { return LLMResponse(text: text) }
+            if !text.isEmpty { return LLMResponse(text: text, usage: parseUsage(object?["usage"] as? [String: Any])) }
         }
         throw LLMError.invalidResponse
     }
 
     func listModels(apiKey: String) async throws -> [ProviderModel] {
         try await modelProvider.listModels(apiKey: apiKey)
+    }
+
+    private func parseUsage(_ usage: [String: Any]?) -> TokenUsage {
+        guard let usage else { return .zero }
+        let input = usage["input_tokens"] as? Int
+            ?? usage["prompt_tokens"] as? Int
+            ?? 0
+        let output = usage["output_tokens"] as? Int
+            ?? usage["completion_tokens"] as? Int
+            ?? 0
+        return TokenUsage(inputTokens: input, outputTokens: output)
     }
 
     private func validate(response: URLResponse, data: Data) throws {

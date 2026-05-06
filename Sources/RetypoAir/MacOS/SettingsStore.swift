@@ -24,6 +24,22 @@ struct PanelFrame: Codable, Equatable {
     }
 }
 
+enum EditorLayoutMode: String, CaseIterable, Identifiable, Codable {
+    case stacked
+    case inline
+
+    var id: String { rawValue }
+    var displayName: String { self == .stacked ? "Stacked" : "Inline diff" }
+}
+
+enum MainTheme: String, CaseIterable, Identifiable, Codable {
+    case glass
+    case lighter
+
+    var id: String { rawValue }
+    var displayName: String { self == .glass ? "Glass" : "Lighter" }
+}
+
 struct RetypoSettings: Codable, Equatable {
     var provider: ProviderKind = .groq
     var modelByProvider: [ProviderKind: String] = [:]
@@ -35,10 +51,64 @@ struct RetypoSettings: Codable, Equatable {
     var enterToCorrect: Bool = true
     var nativeSpellcheck: Bool = true
     var panelFrame: PanelFrame = PanelFrame()
+    var currentActionID: String = "correct"
+    var editorLayout: EditorLayoutMode = .stacked
+    var mainTheme: MainTheme = .glass
+    var shortcutByAction: [String: String] = [
+        "correct": "cmd+1",
+        "improve": "cmd+2",
+        "translate": "cmd+3",
+        "simplify": "cmd+4",
+        "summarize": "cmd+5",
+        "bullets": "cmd+6"
+    ]
+    var shortcutByModel: [String: String] = [:]
+    var acceptedModelIDsByProvider: [ProviderKind: [String]] = [:]
+    var nextModelShortcut: String = "cmd+opt+]"
+    var previousModelShortcut: String = "cmd+opt+["
+    var followActiveScreenOnShow: Bool = true
+    var historyLimit: Int = 10
+
+    init() {}
 
     func selectedModel(for provider: ProviderKind) -> String? {
         let value = modelByProvider[provider]?.trimmingCharacters(in: .whitespacesAndNewlines)
         return value?.isEmpty == false ? value : nil
+    }
+
+    func modelShortcutKey(provider: ProviderKind, modelID: String) -> String {
+        "\(provider.rawValue)::\(modelID)"
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case provider, modelByProvider, autoCorrect, autoCopy, debounceMs, alwaysOnTop, hideAfterCopy, enterToCorrect, nativeSpellcheck, panelFrame, currentActionID, editorLayout, mainTheme, shortcutByAction, shortcutByModel, acceptedModelIDsByProvider, nextModelShortcut, previousModelShortcut, followActiveScreenOnShow, historyLimit
+    }
+
+    init(from decoder: Decoder) throws {
+        self.init()
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        provider = try container.decodeIfPresent(ProviderKind.self, forKey: .provider) ?? provider
+        modelByProvider = try container.decodeIfPresent([ProviderKind: String].self, forKey: .modelByProvider) ?? modelByProvider
+        autoCorrect = try container.decodeIfPresent(Bool.self, forKey: .autoCorrect) ?? autoCorrect
+        autoCopy = try container.decodeIfPresent(Bool.self, forKey: .autoCopy) ?? autoCopy
+        debounceMs = try container.decodeIfPresent(Int.self, forKey: .debounceMs) ?? debounceMs
+        alwaysOnTop = try container.decodeIfPresent(Bool.self, forKey: .alwaysOnTop) ?? alwaysOnTop
+        hideAfterCopy = try container.decodeIfPresent(Bool.self, forKey: .hideAfterCopy) ?? hideAfterCopy
+        enterToCorrect = try container.decodeIfPresent(Bool.self, forKey: .enterToCorrect) ?? enterToCorrect
+        nativeSpellcheck = try container.decodeIfPresent(Bool.self, forKey: .nativeSpellcheck) ?? nativeSpellcheck
+        panelFrame = try container.decodeIfPresent(PanelFrame.self, forKey: .panelFrame) ?? panelFrame
+        currentActionID = try container.decodeIfPresent(String.self, forKey: .currentActionID) ?? currentActionID
+        editorLayout = try container.decodeIfPresent(EditorLayoutMode.self, forKey: .editorLayout) ?? editorLayout
+        mainTheme = try container.decodeIfPresent(MainTheme.self, forKey: .mainTheme) ?? mainTheme
+        if let shortcuts = try container.decodeIfPresent([String: String].self, forKey: .shortcutByAction) {
+            shortcutByAction.merge(shortcuts) { _, new in new }
+        }
+        shortcutByModel = try container.decodeIfPresent([String: String].self, forKey: .shortcutByModel) ?? shortcutByModel
+        acceptedModelIDsByProvider = try container.decodeIfPresent([ProviderKind: [String]].self, forKey: .acceptedModelIDsByProvider) ?? acceptedModelIDsByProvider
+        nextModelShortcut = try container.decodeIfPresent(String.self, forKey: .nextModelShortcut) ?? nextModelShortcut
+        previousModelShortcut = try container.decodeIfPresent(String.self, forKey: .previousModelShortcut) ?? previousModelShortcut
+        followActiveScreenOnShow = try container.decodeIfPresent(Bool.self, forKey: .followActiveScreenOnShow) ?? followActiveScreenOnShow
+        historyLimit = try container.decodeIfPresent(Int.self, forKey: .historyLimit) ?? historyLimit
     }
 }
 

@@ -32,12 +32,14 @@ struct ProviderModel: Identifiable, Hashable, Codable {
     var name: String
     var description: String?
     var contextLength: Int?
+    var pricing: ModelPricing?
 
-    init(id: String, name: String? = nil, description: String? = nil, contextLength: Int? = nil) {
+    init(id: String, name: String? = nil, description: String? = nil, contextLength: Int? = nil, pricing: ModelPricing? = nil) {
         self.id = id
         self.name = name ?? id
         self.description = description
         self.contextLength = contextLength
+        self.pricing = pricing
     }
 }
 
@@ -52,6 +54,7 @@ struct LLMRequest {
 
 struct LLMResponse {
     var text: String
+    var usage: TokenUsage = .zero
 }
 
 enum LLMError: LocalizedError {

@@ -36,7 +36,7 @@ final class OpenAICompatibleProvider: LLMProviderClient {
         let choices = object?["choices"] as? [[String: Any]]
         let message = choices?.first?["message"] as? [String: Any]
         if let text = message?["content"] as? String {
-            return LLMResponse(text: text)
+            return LLMResponse(text: text, usage: parseUsage(object?["usage"] as? [String: Any]))
         }
         throw LLMError.invalidResponse
     }
@@ -58,13 +58,39 @@ final class OpenAICompatibleProvider: LLMProviderClient {
             let description = item["description"] as? String
             let context = item["context_length"] as? Int
                 ?? item["contextLength"] as? Int
-            return ProviderModel(id: id, name: name, description: description, contextLength: context)
+            let pricing = parseModelPricing(item["pricing"] as? [String: Any])
+            return ProviderModel(id: id, name: name, description: description, contextLength: context, pricing: pricing)
         }
         .filter { model in
             let id = model.id.lowercased()
             return !id.contains("embedding") && !id.contains("whisper") && !id.contains("tts") && !id.contains("image") && !id.contains("moderation")
         }
         .sorted { $0.id.localizedCaseInsensitiveCompare($1.id) == .orderedAscending }
+    }
+
+    private func parseModelPricing(_ pricing: [String: Any]?) -> ModelPricing? {
+        guard let pricing else { return nil }
+        func doubleValue(_ key: String) -> Double? {
+            if let value = pricing[key] as? Double { return value }
+            if let value = pricing[key] as? Int { return Double(value) }
+            if let value = pricing[key] as? String { return Double(value) }
+            return nil
+        }
+        guard let prompt = doubleValue("prompt") ?? doubleValue("input"),
+              let completion = doubleValue("completion") ?? doubleValue("output") else { return nil }
+        // OpenRouter exposes prices per token; Retypo stores USD per 1M tokens.
+        return ModelPricing(inputPerMillion: prompt * 1_000_000, outputPerMillion: completion * 1_000_000)
+    }
+
+    private func parseUsage(_ usage: [String: Any]?) -> TokenUsage {
+        guard let usage else { return .zero }
+        let input = usage["prompt_tokens"] as? Int
+            ?? usage["input_tokens"] as? Int
+            ?? 0
+        let output = usage["completion_tokens"] as? Int
+            ?? usage["output_tokens"] as? Int
+            ?? 0
+        return TokenUsage(inputTokens: input, outputTokens: output)
     }
 
     private func validate(response: URLResponse, data: Data) throws {
