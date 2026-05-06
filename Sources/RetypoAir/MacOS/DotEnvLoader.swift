@@ -3,16 +3,25 @@ import Foundation
 enum DotEnvLoader {
     @discardableResult
     static func load() -> [String: String] {
-        let candidates = [
+        let bundleURL = Bundle.main.bundleURL
+        let candidates = unique([
             URL(fileURLWithPath: FileManager.default.currentDirectoryPath).appendingPathComponent(".env"),
+            Bundle.main.resourceURL?.appendingPathComponent(".env"),
+            bundleURL.deletingLastPathComponent().appendingPathComponent(".env"),
+            bundleURL.deletingLastPathComponent().deletingLastPathComponent().appendingPathComponent(".env"),
             SettingsStore.directory.appendingPathComponent(".env")
-        ]
+        ].compactMap(\.self))
 
         var loaded: [String: String] = [:]
         for url in candidates where FileManager.default.fileExists(atPath: url.path) {
             loaded.merge(loadFile(url)) { current, _ in current }
         }
         return loaded
+    }
+
+    private static func unique(_ urls: [URL]) -> [URL] {
+        var seen = Set<String>()
+        return urls.filter { seen.insert($0.standardizedFileURL.path).inserted }
     }
 
     private static func loadFile(_ url: URL) -> [String: String] {

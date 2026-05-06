@@ -2,11 +2,16 @@ import AppKit
 import Carbon
 
 final class HotkeyService {
-    private let handler: () -> Void
-    private var hotKeyRef: EventHotKeyRef?
+    enum Action {
+        case togglePanel
+        case importSelection
+    }
+
+    private let handler: (Action) -> Void
+    private var hotKeyRefs: [EventHotKeyRef] = []
     private var eventHandler: EventHandlerRef?
 
-    init(handler: @escaping () -> Void) {
+    init(handler: @escaping (Action) -> Void) {
         self.handler = handler
     }
 
@@ -16,18 +21,55 @@ final class HotkeyService {
         InstallEventHandler(GetApplicationEventTarget(), { _, event, userData in
             guard let userData else { return noErr }
             let service = Unmanaged<HotkeyService>.fromOpaque(userData).takeUnretainedValue()
-            service.handler()
+            guard let action = HotkeyService.action(from: event) else { return noErr }
+            DebugLog.log("hotkey fired action=\(action)")
+            service.handler(action)
             return noErr
         }, 1, &eventType, selfPointer, &eventHandler)
 
         let signature = OSType(UInt32(ascii: "RTYP"))
-        let hotKeyID = EventHotKeyID(signature: signature, id: 1)
-        RegisterEventHotKey(UInt32(kVK_Space), UInt32(cmdKey | shiftKey), hotKeyID, GetApplicationEventTarget(), 0, &hotKeyRef)
+        register(keyCode: UInt32(kVK_Space), modifiers: UInt32(cmdKey | shiftKey), id: 1, signature: signature)
+        register(keyCode: UInt32(kVK_Return), modifiers: UInt32(cmdKey | shiftKey), id: 2, signature: signature)
+        register(keyCode: UInt32(kVK_ANSI_KeypadEnter), modifiers: UInt32(cmdKey | shiftKey), id: 3, signature: signature)
+        register(keyCode: UInt32(kVK_ANSI_I), modifiers: UInt32(cmdKey | shiftKey | optionKey), id: 4, signature: signature)
     }
 
     deinit {
-        if let hotKeyRef { UnregisterEventHotKey(hotKeyRef) }
+        for hotKeyRef in hotKeyRefs { UnregisterEventHotKey(hotKeyRef) }
         if let eventHandler { RemoveEventHandler(eventHandler) }
+    }
+
+    private func register(keyCode: UInt32, modifiers: UInt32, id: UInt32, signature: OSType) {
+        var hotKeyRef: EventHotKeyRef?
+        let hotKeyID = EventHotKeyID(signature: signature, id: id)
+        let status = RegisterEventHotKey(keyCode, modifiers, hotKeyID, GetApplicationEventTarget(), 0, &hotKeyRef)
+        if status == noErr, let hotKeyRef {
+            hotKeyRefs.append(hotKeyRef)
+        }
+        DebugLog.log("hotkey register id=\(id) keyCode=\(keyCode) modifiers=\(modifiers) status=\(status)")
+    }
+
+    private static func action(from event: EventRef?) -> Action? {
+        guard let event else { return nil }
+        var hotKeyID = EventHotKeyID()
+        let status = GetEventParameter(
+            event,
+            EventParamName(kEventParamDirectObject),
+            EventParamType(typeEventHotKeyID),
+            nil,
+            MemoryLayout<EventHotKeyID>.size,
+            nil,
+            &hotKeyID
+        )
+        guard status == noErr else { return nil }
+        switch hotKeyID.id {
+        case 1:
+            return .togglePanel
+        case 2, 3, 4:
+            return .importSelection
+        default:
+            return nil
+        }
     }
 }
 

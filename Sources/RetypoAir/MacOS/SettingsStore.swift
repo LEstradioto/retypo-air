@@ -41,18 +41,20 @@ enum MainTheme: String, CaseIterable, Identifiable, Codable {
 }
 
 struct RetypoSettings: Codable, Equatable {
-    var provider: ProviderKind = .groq
-    var modelByProvider: [ProviderKind: String] = [:]
-    var autoCorrect: Bool = true
+    var provider: ProviderKind = .anthropic
+    var modelByProvider: [ProviderKind: String] = [
+        .anthropic: "claude-haiku-4-5-20251001"
+    ]
+    var autoCorrect: Bool = false
     var autoCopy: Bool = true
     var debounceMs: Int = 500
-    var alwaysOnTop: Bool = true
+    var alwaysOnTop: Bool = false
     var hideAfterCopy: Bool = false
     var enterToCorrect: Bool = true
     var nativeSpellcheck: Bool = true
     var panelFrame: PanelFrame = PanelFrame()
     var currentActionID: String = "correct"
-    var editorLayout: EditorLayoutMode = .stacked
+    var editorLayout: EditorLayoutMode = .inline
     var mainTheme: MainTheme = .glass
     var shortcutByAction: [String: String] = [
         "correct": "cmd+1",
@@ -60,7 +62,11 @@ struct RetypoSettings: Codable, Equatable {
         "translate": "cmd+3",
         "simplify": "cmd+4",
         "summarize": "cmd+5",
-        "bullets": "cmd+6"
+        "bullets": "cmd+6",
+        "better-way": "cmd+7",
+        "tweet-fit": "cmd+8",
+        "variations-3": "cmd+9",
+        "respond-3-ways": "cmd+0"
     ]
     var shortcutByModel: [String: String] = [:]
     var acceptedModelIDsByProvider: [ProviderKind: [String]] = [:]

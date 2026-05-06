@@ -27,6 +27,26 @@ It is designed for terminal-based agent harnesses like Claude Code and Codex, bu
 - Swift 5.9+
 - At least one provider API key
 
+## Build a dev .app
+
+Use the dev app bundle when testing selected-text import, because macOS Accessibility permissions are more reliable for an `.app` identity than for `swift run`:
+
+```bash
+scripts/dev-app.sh
+```
+
+The script creates and opens `build-dev/RetypoAir-dev.app`. Grant **Retypo Air Dev** in System Settings → Privacy & Security → Accessibility when prompted.
+
+### Quit/reload dev app
+
+Use `Cmd+Q` while Retypo Air is focused, or run:
+
+```bash
+osascript -e 'tell application id "app.retypoair.dev" to quit'
+```
+
+Then rerun `scripts/dev-app.sh`.
+
 ## Quick start
 
 ```bash
@@ -74,9 +94,9 @@ The footer exposes the current mode, model, layout, auto/manual state, settings,
 | Shortcut | Action |
 | --- | --- |
 | `Cmd+Shift+Space` | Show/hide the main panel |
+| `Cmd+Shift+Enter` | Import selected text when another app is focused; run all modes when Retypo is focused |
 | `Enter` | Run current mode and copy result |
 | `Shift+Enter` | New line |
-| `Cmd+Shift+Enter` | Run all enabled modes into Candidates |
 | `Cmd+D` | Toggle Candidates |
 | `Cmd+S` | Toggle/close Settings |
 | `Esc` | Hide main panel |
@@ -88,6 +108,24 @@ The footer exposes the current mode, model, layout, auto/manual state, settings,
 | `Cmd+C/V/X` | Copy, paste, cut inside editor |
 | `Option+Arrow` | Move by word |
 | `Shift+Option+Arrow` | Select by word |
+
+
+
+### Debug selected-text import
+
+If selected-text import does not work, try once and inspect:
+
+```bash
+tail -n 80 ~/.retypo-air/import-debug.log
+```
+
+Alternative experimental import hotkey: `Cmd+Option+Shift+I`.
+
+## Experimental selected-text import
+
+Press `Cmd+Shift+Enter` while another app is focused to import its selected text into Retypo Air. The app temporarily performs `Cmd+C`, reads the copied text, restores your previous clipboard, and focuses the Retypo editor.
+
+This is intentionally best-effort. It is exact for selected text in apps that support copy. If Retypo already has draft text, it asks before replacing it. Terminal/TUI apps may need macOS Accessibility permission, and Retypo does not scrape terminal screen contents.
 
 ## Editing modes
 

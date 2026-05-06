@@ -1,5 +1,10 @@
 .build/
 .swiftpm/
+.swift-home/
+.swiftpm-modulecache/
+.clang-cache/
+build-dev/
+dist/
 .DS_Store
 .env
 .env.*

@@ -93,15 +93,31 @@ struct RetypoView: View {
             .pointingCursor()
 
             Button { state.requestSettings() } label: {
-                footerLink("⚙", active: false, focused: state.footerFocusIndex == 4)
+                footerSettingsIcon(focused: state.footerFocusIndex == 4)
             }
             .buttonStyle(.plain)
             .pointingCursor()
 
             Spacer(minLength: 6)
             if state.isCorrecting { ProgressView().controlSize(.small) }
+            Button { state.undoEditorChange() } label: {
+                footerIcon("arrow.uturn.backward", active: state.canUndoEditorChange, focused: state.footerFocusIndex == 5)
+            }
+            .buttonStyle(.plain)
+            .keyboardShortcut("z", modifiers: .command)
+            .disabled(!state.canUndoEditorChange)
+            .pointingCursor()
+
+            Button { state.redoEditorChange() } label: {
+                footerIcon("arrow.uturn.forward", active: state.canRedoEditorChange, focused: state.footerFocusIndex == 6)
+            }
+            .buttonStyle(.plain)
+            .keyboardShortcut("Z", modifiers: [.command, .shift])
+            .disabled(!state.canRedoEditorChange)
+            .pointingCursor()
+
             Button { state.toggleCandidateOverlay() } label: {
-                footerLink("Diff", active: state.showCandidateOverlay, focused: state.footerFocusIndex == 5)
+                footerLink("Diff", active: state.showCandidateOverlay, focused: state.footerFocusIndex == 7)
             }
             .buttonStyle(.plain)
 
@@ -110,7 +126,7 @@ struct RetypoView: View {
                 Text("Session: \(state.sessionCostLabel)")
                 Text("Today: \(state.dayCostLabel)")
             } label: {
-                footerLink("Last \(state.lastCostLabel)", active: state.lastCost.costUSD != nil, focused: state.footerFocusIndex == 6, maxWidth: 92)
+                footerLink("Last \(state.lastCostLabel)", active: state.lastCost.costUSD != nil, focused: state.footerFocusIndex == 8, maxWidth: 92)
             }
             .menuStyle(.borderlessButton)
             Text("\(Int(state.wordsPerMinute))wpm")
@@ -151,6 +167,28 @@ struct RetypoView: View {
             .pointingCursor()
     }
 
+    private func footerIcon(_ systemName: String, active: Bool, focused: Bool = false) -> some View {
+        Image(systemName: systemName)
+            .font(.system(size: 10.5, weight: .semibold))
+            .foregroundStyle(active || focused ? Color.accentColor.opacity(isLighter ? 0.78 : 0.98) : Color.secondary.opacity(isLighter ? 0.42 : 0.72))
+            .frame(width: focused ? 18 : 14, height: 14)
+            .background(Capsule(style: .continuous).fill(focused ? Color.accentColor.opacity(0.13) : Color.clear))
+            .overlay(Capsule(style: .continuous).strokeBorder(focused ? Color.accentColor.opacity(0.42) : Color.clear, lineWidth: 1))
+            .contentShape(Rectangle())
+            .pointingCursor()
+    }
+
+    private func footerSettingsIcon(focused: Bool = false) -> some View {
+        Image(systemName: "gearshape.fill")
+            .font(.system(size: 12.5, weight: .semibold))
+            .foregroundStyle(focused ? Color.accentColor.opacity(isLighter ? 0.84 : 1.0) : Color.secondary.opacity(isLighter ? 0.68 : 0.92))
+            .frame(width: focused ? 25 : 23, height: 18)
+            .background(Capsule(style: .continuous).fill(focused ? Color.accentColor.opacity(0.13) : Color.white.opacity(isLighter ? 0.025 : 0.045)))
+            .overlay(Capsule(style: .continuous).strokeBorder(focused ? Color.accentColor.opacity(0.42) : Color.white.opacity(0.08), lineWidth: 1))
+            .contentShape(Rectangle())
+            .pointingCursor()
+    }
+
     private var stackedEditor: some View {
         VStack(spacing: isLighter ? 6 : 8) {
             editorBox(title: "Draft", minHeight: 44)
@@ -183,6 +221,8 @@ struct RetypoView: View {
                 onEnterInOverlay: { if state.footerFocusIndex != nil { state.activateFooterFocus(); return true }; if state.showCandidateOverlay, state.candidateResults.isEmpty { Task { await state.runSelectedLauncherMode() }; return true }; return false },
                 onToggleOverlay: { state.toggleCandidateOverlay() },
                 onSettings: { state.requestSettings() },
+                onUndo: { state.undoEditorChange() },
+                onRedo: { state.redoEditorChange() },
                 onShortcut: { state.handleShortcut($0) }
             )
             .frame(minHeight: minHeight)
@@ -913,6 +953,8 @@ struct CandidateCard: View {
             HStack(spacing: 8) {
                 Text(candidate.action.title)
                     .font(.system(size: 12, weight: .semibold, design: .rounded))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
                 Spacer()
                 Text(candidate.costUSD.map { String(format: "$%.4f", $0) } ?? "$—")
                     .font(.system(size: 10.5, weight: .medium, design: .monospaced))

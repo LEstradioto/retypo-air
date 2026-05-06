@@ -16,6 +16,8 @@ struct NativeTextEditor: NSViewRepresentable {
     var onEnterInOverlay: () -> Bool = { false }
     var onToggleOverlay: () -> Void = {}
     var onSettings: () -> Void = {}
+    var onUndo: () -> Bool = { false }
+    var onRedo: () -> Bool = { false }
     var onShortcut: (String) -> Bool = { _ in false }
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
@@ -37,6 +39,8 @@ struct NativeTextEditor: NSViewRepresentable {
         textView.onEnterInOverlay = onEnterInOverlay
         textView.onToggleOverlay = onToggleOverlay
         textView.onSettings = onSettings
+        textView.onUndo = onUndo
+        textView.onRedo = onRedo
         textView.onShortcut = onShortcut
         configure(textView)
         textView.string = text
@@ -50,6 +54,7 @@ struct NativeTextEditor: NSViewRepresentable {
         let selected = textView.selectedRange()
         if textView.string != text {
             textView.string = text
+            textView.undoManager?.removeAllActions()
             let safeLocation = min(selected.location, (text as NSString).length)
             textView.setSelectedRange(NSRange(location: safeLocation, length: 0))
         }
@@ -62,6 +67,8 @@ struct NativeTextEditor: NSViewRepresentable {
         textView.onEnterInOverlay = onEnterInOverlay
         textView.onToggleOverlay = onToggleOverlay
         textView.onSettings = onSettings
+        textView.onUndo = onUndo
+        textView.onRedo = onRedo
         textView.onShortcut = onShortcut
         configure(textView)
         applyHighlights(to: textView)
@@ -127,9 +134,15 @@ final class KeyHandlingTextView: NSTextView {
     var onEnterInOverlay: (() -> Bool)?
     var onToggleOverlay: (() -> Void)?
     var onSettings: (() -> Void)?
+    var onUndo: (() -> Bool)?
+    var onRedo: (() -> Bool)?
     var onShortcut: ((String) -> Bool)?
 
     override func keyDown(with event: NSEvent) {
+        if isQuit(event) {
+            NSApp.terminate(nil)
+            return
+        }
         if handleClipboardAndUndo(event) { return }
         if handleControlLineEditing(event) { return }
         if handleOptionArrow(event) { return }
@@ -190,14 +203,33 @@ final class KeyHandlingTextView: NSTextView {
             return true
         case 6: // Z
             if event.modifierFlags.contains(.shift) {
+                if undoManager?.canRedo == true {
+                    undoManager?.redo()
+                } else {
+                    _ = onRedo?()
+                }
+            } else {
+                if undoManager?.canUndo == true {
+                    undoManager?.undo()
+                } else {
+                    _ = onUndo?()
+                }
+            }
+            return true
+        case 16: // Y
+            if undoManager?.canRedo == true {
                 undoManager?.redo()
             } else {
-                undoManager?.undo()
+                _ = onRedo?()
             }
             return true
         default:
             return false
         }
+    }
+
+    private func isQuit(_ event: NSEvent) -> Bool {
+        event.keyCode == 12 && event.modifierFlags.contains(.command) // Q
     }
 
     private func handleControlLineEditing(_ event: NSEvent) -> Bool {

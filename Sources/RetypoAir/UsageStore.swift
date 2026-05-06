@@ -161,6 +161,12 @@ struct CandidateResult: Identifiable, Hashable {
     var costUSD: Double?
 }
 
+struct PendingImport: Identifiable, Hashable {
+    var id: UUID = UUID()
+    var text: String
+    var source: String
+}
+
 enum DraftStore {
     static var fileURL: URL { SettingsStore.directory.appendingPathComponent("draft.txt") }
 

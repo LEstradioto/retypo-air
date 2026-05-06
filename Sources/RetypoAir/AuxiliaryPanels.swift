@@ -8,6 +8,7 @@ final class AuxiliaryPanelController {
     private let settingsFocus = SettingsFocusCoordinator()
     private var settingsPanel: NSPanel?
     private var candidatesPanel: NSPanel?
+    private var importPromptPanel: NSPanel?
 
     init(mainPanel: NSWindow, state: AppState) {
         self.mainPanel = mainPanel
@@ -63,7 +64,7 @@ final class AuxiliaryPanelController {
     func showCandidates() {
         guard let state else { return }
         if candidatesPanel == nil {
-            let panel = makePanel(width: 900, height: 230, minWidth: 360, minHeight: 140, radius: 18)
+            let panel = makePanel(width: 900, height: 230, minWidth: 240, minHeight: 140, radius: 18)
             panel.contentView = roundedHostingView(rootView: CandidateOverlayWindowView().environmentObject(state), radius: 18)
             panel.onTabKey = { [weak state] in
                 guard let state else { return }
@@ -115,9 +116,50 @@ final class AuxiliaryPanelController {
         visible ? showCandidates() : hideCandidates(focusMain: true)
     }
 
+    func showImportPrompt() {
+        guard let state else { return }
+        if importPromptPanel == nil {
+            let panel = makePanel(width: 460, height: 92, minWidth: 340, minHeight: 78, radius: 18)
+            panel.contentView = roundedHostingView(rootView: ImportConfirmWindowView().environmentObject(state), radius: 18)
+            panel.onEnterKey = { [weak state] in
+                state?.confirmPendingImport()
+                return true
+            }
+            panel.onCloseKey = { [weak state] in
+                state?.cancelPendingImport()
+            }
+            panel.onCommandSKey = { [weak state] in
+                state?.cancelPendingImport()
+            }
+            importPromptPanel = panel
+        }
+        guard let importPromptPanel else { return }
+        positionImportPrompt(importPromptPanel)
+        NSApp.activate(ignoringOtherApps: true)
+        importPromptPanel.makeKeyAndOrderFront(nil)
+        importPromptPanel.orderFrontRegardless()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.04) { [weak importPromptPanel] in
+            importPromptPanel?.makeKeyAndOrderFront(nil)
+            importPromptPanel?.makeFirstResponder(importPromptPanel?.contentView)
+        }
+    }
+
+    func hideImportPrompt(focusMain: Bool) {
+        importPromptPanel?.orderOut(nil)
+        if focusMain { focusMainEditor() }
+    }
+
+    func setImportPromptVisible(_ visible: Bool) {
+        visible ? showImportPrompt() : hideImportPrompt(focusMain: true)
+    }
+
     func repositionCandidatesIfVisible() {
-        guard candidatesPanel?.isVisible == true, let candidatesPanel else { return }
-        positionCandidates(candidatesPanel)
+        if candidatesPanel?.isVisible == true, let candidatesPanel {
+            positionCandidates(candidatesPanel)
+        }
+        if importPromptPanel?.isVisible == true, let importPromptPanel {
+            positionImportPrompt(importPromptPanel)
+        }
     }
 
     private func makePanel(width: CGFloat, height: CGFloat, minWidth: CGFloat, minHeight: CGFloat, radius: CGFloat) -> KeyableAuxiliaryPanel {
@@ -233,9 +275,23 @@ final class AuxiliaryPanelController {
         guard let screen else { return }
         let visible = screen.visibleFrame
         let main = mainPanel.frame
-        let width = max(360, visible.width - 48)
+        let horizontalPadding: CGFloat = visible.width < 420 ? 12 : 24
+        let width = min(max(240, visible.width - horizontalPadding * 2), max(1, visible.width - 8))
         let height = max(154, min(230, visible.height * 0.24))
         let x = visible.midX - width / 2
+        let y = min(visible.maxY - height - 16, main.maxY + 10)
+        panel.setFrame(NSRect(x: x, y: y, width: width, height: height), display: false)
+    }
+
+    private func positionImportPrompt(_ panel: NSPanel) {
+        guard let mainPanel else { return }
+        let screen = mainPanel.screen ?? NSScreen.main
+        guard let screen else { return }
+        let visible = screen.visibleFrame
+        let main = mainPanel.frame
+        let width = min(max(360, main.width), visible.width - 48)
+        let height: CGFloat = 92
+        let x = min(max(visible.minX + 24, main.midX - width / 2), visible.maxX - width - 24)
         let y = min(visible.maxY - height - 16, main.maxY + 10)
         panel.setFrame(NSRect(x: x, y: y, width: width, height: height), display: false)
     }

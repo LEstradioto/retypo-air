@@ -55,6 +55,11 @@ final class KeyableAuxiliaryPanel: NSPanel {
             guard let onEnterKey else { return false }
             return onEnterKey()
         }
+        if event.keyCode == 53 { // escape
+            guard let onCloseKey else { return false }
+            onCloseKey()
+            return true
+        }
         return false
     }
 }

@@ -1,9 +1,25 @@
 import Foundation
 import AppKit
 
+private struct EditorSnapshot: Equatable {
+    var inputText: String
+    var correctedText: String
+    var outputText: String
+    var status: String
+    var diffText: String
+    var inlineHighlightRanges: [NSRange]
+    var candidateResults: [CandidateResult]
+    var showCandidateOverlay: Bool
+    var selectedCandidateIndex: Int
+    var wordsChangedLast: Int
+    var lastAutoSubmittedHash: Int?
+    var typingStartedAt: Date?
+}
+
 @MainActor
 final class AppState: ObservableObject {
-    private let footerFocusItemCount = 7
+    private let footerFocusItemCount = 9
+    private let editorUndoLimit = 50
 
     @Published var settings: RetypoSettings
     @Published var inputText: String = ""
@@ -31,6 +47,9 @@ final class AppState: ObservableObject {
     @Published var wordsPerMinute: Double = 0
     @Published var wordsChangedLast = 0
     @Published var footerFocusIndex: Int? = nil
+    @Published var pendingImport: PendingImport?
+    @Published private(set) var canUndoEditorChange = false
+    @Published private(set) var canRedoEditorChange = false
 
 
     var onAlwaysOnTopChanged: ((Bool) -> Void)?
@@ -38,6 +57,7 @@ final class AppState: ObservableObject {
     var onShowRequested: (() -> Void)?
     var onSettingsRequested: (() -> Void)?
     var onCandidatesVisibilityChanged: ((Bool) -> Void)?
+    var onImportConfirmationChanged: ((Bool) -> Void)?
 
     private let router = LLMRouter()
     private let debouncer = Debouncer()
@@ -46,16 +66,25 @@ final class AppState: ObservableObject {
     private var correctionGeneration = 0
     private var suppressNextInputChange = false
     private var typingStartedAt: Date?
+    private var editorUndoStack: [EditorSnapshot] = []
+    private var editorRedoStack: [EditorSnapshot] = []
 
     init(settings: RetypoSettings) {
         self.settings = settings
         self.actions = EditActionStore.load()
         self.history = HistoryStore.load()
         self.usageLedger = UsageLedgerStore.load()
-        self.pricing = PricingStore.load()
+        var loadedPricing = PricingStore.load()
+        var pricingChanged = false
+        for (key, value) in DefaultPricing.exact where loadedPricing[key] != value {
+            loadedPricing[key] = value
+            pricingChanged = true
+        }
+        self.pricing = loadedPricing
         self.draftSnapshots = DraftSnapshotStore.load()
         self.inputText = DraftStore.load()
         self.dayCostUSD = Self.costToday(from: self.usageLedger)
+        if pricingChanged { PricingStore.save(loadedPricing) }
     }
 
     var selectedProvider: ProviderKind {
@@ -145,6 +174,7 @@ final class AppState: ObservableObject {
     }
 
     func restoreHistory(_ entry: HistoryEntry, useOutput: Bool = false) {
+        pushEditorUndoSnapshot()
         inputText = useOutput ? entry.output : entry.input
         outputText = entry.output
         diffText = entry.diff
@@ -195,6 +225,58 @@ final class AppState: ObservableObject {
         onSettingsRequested?()
     }
 
+    @discardableResult
+    func receiveExternalImport(_ text: String, source: String) -> Bool {
+        let trimmedIncoming = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedIncoming.isEmpty, !text.hasPrefix("__RETYP_AIR_IMPORT_EMPTY_") else {
+            status = "No selected text imported"
+            return false
+        }
+
+        let existing = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !existing.isEmpty, inputText != text {
+            pendingImport = PendingImport(text: text, source: source)
+            status = "Confirm import from \(source)"
+            return true
+        }
+
+        importExternalText(text, source: source)
+        return false
+    }
+
+    func confirmPendingImport() {
+        guard let pendingImport else { return }
+        let text = pendingImport.text
+        let source = pendingImport.source
+        self.pendingImport = nil
+        onImportConfirmationChanged?(false)
+        importExternalText(text, source: source)
+    }
+
+    func cancelPendingImport() {
+        pendingImport = nil
+        onImportConfirmationChanged?(false)
+        status = "Import cancelled"
+    }
+
+    private func importExternalText(_ text: String, source: String) {
+        pushEditorUndoSnapshot()
+        inputText = text
+        outputText = ""
+        correctedText = ""
+        diffText = ""
+        inlineHighlightRanges = []
+        candidateResults = []
+        showCandidateOverlay = false
+        selectedCandidateIndex = 0
+        footerFocusIndex = nil
+        wordsChangedLast = 0
+        lastAutoSubmittedHash = nil
+        typingStartedAt = Date()
+        DraftStore.save(inputText)
+        status = "Imported selection from \(source)"
+    }
+
     func cycleFooterFocus() {
         if let index = footerFocusIndex {
             let next = index + 1
@@ -240,8 +322,12 @@ final class AppState: ObservableObject {
         case 4:
             requestSettings()
         case 5:
-            toggleCandidateOverlay()
+            _ = undoEditorChange()
         case 6:
+            _ = redoEditorChange()
+        case 7:
+            toggleCandidateOverlay()
+        case 8:
             status = "Last \(lastCostLabel) · Session \(sessionCostLabel) · Today \(dayCostLabel)"
         default:
             break
@@ -302,6 +388,7 @@ final class AppState: ObservableObject {
 
     func restoreSelectedCandidateToEditor() {
         guard candidateResults.indices.contains(selectedCandidateIndex) else { return }
+        pushEditorUndoSnapshot()
         inputText = candidateResults[selectedCandidateIndex].output
         DraftStore.save(inputText)
         setCandidateOverlayVisible(false)
@@ -342,6 +429,10 @@ final class AppState: ObservableObject {
     }
 
     func onInputChanged() {
+        if !suppressNextInputChange, !editorRedoStack.isEmpty {
+            editorRedoStack.removeAll()
+            publishUndoRedoAvailability()
+        }
         if typingStartedAt == nil { typingStartedAt = Date() }
         updateTypingStats()
         DraftStore.save(inputText)
@@ -460,6 +551,34 @@ final class AppState: ObservableObject {
         if settings.hideAfterCopy { onHideRequested?() }
     }
 
+    @discardableResult
+    func undoEditorChange() -> Bool {
+        guard let snapshot = editorUndoStack.popLast() else {
+            status = "Nothing to undo"
+            publishUndoRedoAvailability()
+            return false
+        }
+        editorRedoStack.append(currentEditorSnapshot())
+        restoreEditorSnapshot(snapshot)
+        status = "Undone"
+        publishUndoRedoAvailability()
+        return true
+    }
+
+    @discardableResult
+    func redoEditorChange() -> Bool {
+        guard let snapshot = editorRedoStack.popLast() else {
+            status = "Nothing to redo"
+            publishUndoRedoAvailability()
+            return false
+        }
+        editorUndoStack.append(currentEditorSnapshot())
+        restoreEditorSnapshot(snapshot)
+        status = "Redone"
+        publishUndoRedoAvailability()
+        return true
+    }
+
     func handleShortcut(_ rawShortcut: String) -> Bool {
         let shortcut = ShortcutFormatter.normalize(rawShortcut)
         guard !shortcut.isEmpty else { return false }
@@ -514,12 +633,12 @@ final class AppState: ObservableObject {
         var changed = false
         for model in models {
             let key = PricingStore.key(provider: provider, model: model.id)
-            if pricing[key] == nil, let value = model.pricing ?? DefaultPricing.pricing(provider: provider, modelID: model.id) {
+            if let value = model.pricing ?? DefaultPricing.pricing(provider: provider, modelID: model.id), pricing[key] != value {
                 pricing[key] = value
                 changed = true
             }
         }
-        for (key, value) in DefaultPricing.exact where pricing[key] == nil {
+        for (key, value) in DefaultPricing.exact where pricing[key] != value {
             pricing[key] = value
             changed = true
         }
@@ -541,6 +660,7 @@ final class AppState: ObservableObject {
     }
 
     private func applyResult(_ text: String, original: String, changed: Bool, response: LLMResponse, action: EditAction) {
+        pushEditorUndoSnapshot()
         correctedText = text
         outputText = text
         diffText = DiffService.compactDiff(original: original, corrected: text)
@@ -573,6 +693,55 @@ final class AppState: ObservableObject {
         candidateResults.append(CandidateResult(action: action, output: output, diff: diff, usage: response.usage, costUSD: cost))
         appendHistory(original: original, output: output, diff: diff, action: action, usage: response.usage, costUSD: cost)
         appendUsage(model: selectedModel ?? "", usage: response.usage, costUSD: cost)
+    }
+
+    private func currentEditorSnapshot() -> EditorSnapshot {
+        EditorSnapshot(
+            inputText: inputText,
+            correctedText: correctedText,
+            outputText: outputText,
+            status: status,
+            diffText: diffText,
+            inlineHighlightRanges: inlineHighlightRanges,
+            candidateResults: candidateResults,
+            showCandidateOverlay: showCandidateOverlay,
+            selectedCandidateIndex: selectedCandidateIndex,
+            wordsChangedLast: wordsChangedLast,
+            lastAutoSubmittedHash: lastAutoSubmittedHash,
+            typingStartedAt: typingStartedAt
+        )
+    }
+
+    private func pushEditorUndoSnapshot() {
+        let snapshot = currentEditorSnapshot()
+        guard editorUndoStack.last != snapshot else { return }
+        editorUndoStack.append(snapshot)
+        if editorUndoStack.count > editorUndoLimit {
+            editorUndoStack.removeFirst(editorUndoStack.count - editorUndoLimit)
+        }
+        editorRedoStack.removeAll()
+        publishUndoRedoAvailability()
+    }
+
+    private func restoreEditorSnapshot(_ snapshot: EditorSnapshot) {
+        inputText = snapshot.inputText
+        correctedText = snapshot.correctedText
+        outputText = snapshot.outputText
+        diffText = snapshot.diffText
+        inlineHighlightRanges = snapshot.inlineHighlightRanges
+        candidateResults = snapshot.candidateResults
+        showCandidateOverlay = snapshot.showCandidateOverlay
+        selectedCandidateIndex = min(snapshot.selectedCandidateIndex, max(0, candidateResults.count - 1))
+        wordsChangedLast = snapshot.wordsChangedLast
+        lastAutoSubmittedHash = snapshot.lastAutoSubmittedHash
+        typingStartedAt = snapshot.typingStartedAt ?? Date()
+        DraftStore.save(inputText)
+        onCandidatesVisibilityChanged?(showCandidateOverlay)
+    }
+
+    private func publishUndoRedoAvailability() {
+        canUndoEditorChange = !editorUndoStack.isEmpty
+        canRedoEditorChange = !editorRedoStack.isEmpty
     }
 
     private func appendHistory(original: String, output: String, diff: String, action: EditAction, usage: TokenUsage, costUSD: Double?) {
