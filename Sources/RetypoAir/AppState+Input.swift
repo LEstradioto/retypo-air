@@ -1,0 +1,97 @@
+import Foundation
+
+extension AppState {
+    @discardableResult
+    func receiveExternalImport(_ text: String, source: String) -> Bool {
+        let trimmedIncoming = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedIncoming.isEmpty, !text.hasPrefix("__RETYP_AIR_IMPORT_EMPTY_") else {
+            status = "No selected text imported"
+            return false
+        }
+
+        let existing = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !existing.isEmpty, inputText != text {
+            pendingImport = PendingImport(text: text, source: source)
+            status = "Confirm import from \(source)"
+            return true
+        }
+
+        importExternalText(text, source: source)
+        return false
+    }
+
+    func confirmPendingImport() {
+        guard let pendingImport else { return }
+        let text = pendingImport.text
+        let source = pendingImport.source
+        self.pendingImport = nil
+        onImportConfirmationChanged?(false)
+        importExternalText(text, source: source)
+    }
+
+    func cancelPendingImport() {
+        pendingImport = nil
+        onImportConfirmationChanged?(false)
+        status = "Import cancelled"
+    }
+
+    func importExternalText(_ text: String, source: String) {
+        pushEditorUndoSnapshot()
+        inputText = text
+        outputText = ""
+        correctedText = ""
+        diffText = ""
+        inlineHighlightRanges = []
+        candidateResults = []
+        showCandidateOverlay = false
+        selectedCandidateIndex = 0
+        footerFocusIndex = nil
+        wordsChangedLast = 0
+        lastAutoSubmittedHash = nil
+        typingStartedAt = Date()
+        DraftStore.save(inputText)
+        status = "Imported selection from \(source)"
+    }
+
+    func onInputChanged() {
+        if !suppressNextInputChange, !editorRedoStack.isEmpty {
+            editorRedoStack.removeAll()
+            publishUndoRedoAvailability()
+        }
+        if typingStartedAt == nil { typingStartedAt = Date() }
+        updateTypingStats()
+        DraftStore.save(inputText)
+        scheduleDraftSnapshot()
+        inlineHighlightRanges = []
+        guard !suppressNextInputChange else {
+            suppressNextInputChange = false
+            return
+        }
+        guard settings.autoCorrect else { return }
+        guard CorrectionPolicy.shouldAutoCorrect(inputText) else { return }
+        let hash = inputText.hashValue
+        guard hash != lastAutoSubmittedHash else { return }
+        debouncer.schedule(milliseconds: settings.debounceMs) { [weak self] in
+            guard let self else { return }
+            await self.runCurrentAction(source: "auto")
+        }
+    }
+
+    func refreshModelsIfPossible() async {
+        await refreshModels(for: settings.provider)
+    }
+
+    func refreshModels(for provider: ProviderKind) async {
+        isLoadingModels = true
+        status = "Loading \(provider.displayName) models"
+        do {
+            let models = try await router.listModels(for: provider)
+            modelsByProvider[provider] = models
+            mergePricingDefaults(for: provider, models: models)
+            status = models.isEmpty ? "No models returned" : "Loaded \(models.count) models"
+        } catch {
+            status = error.localizedDescription
+        }
+        isLoadingModels = false
+    }
+}

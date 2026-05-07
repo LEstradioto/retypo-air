@@ -1,0 +1,104 @@
+import Foundation
+
+extension AppState {
+    func applyResult(_ outcome: ActionOutcome) {
+        pushEditorUndoSnapshot()
+        let text = outcome.text
+        correctedText = text
+        outputText = text
+        diffText = DiffService.compactDiff(original: outcome.original, corrected: text)
+        wordsChangedLast = InlineDiffService.changedWordCount(original: outcome.original, corrected: text)
+        let cost = computeCost(provider: settings.provider, model: selectedModel ?? "", usage: outcome.response.usage)
+        lastCost = CostSnapshot(usage: outcome.response.usage, costUSD: cost)
+        if let cost {
+            sessionCostUSD += cost
+            dayCostUSD += cost
+        }
+        appendHistory(HistoryDraft(original: outcome.original, output: text, diff: diffText, action: outcome.action, usage: outcome.response.usage, costUSD: cost))
+        appendUsage(model: selectedModel ?? "", usage: outcome.response.usage, costUSD: cost)
+        if settings.editorLayout == .inline {
+            inlineHighlightRanges = InlineDiffService.changedRanges(original: outcome.original, corrected: text)
+            suppressNextInputChange = true
+            inputText = text
+            DraftStore.save(inputText)
+            lastAutoSubmittedHash = inputText.hashValue
+        }
+        if settings.autoCopy {
+            copyOutput(text)
+        } else {
+            status = outcome.changed ? "Done" : "No changes"
+        }
+    }
+
+    func appendCandidate(output: String, original: String, response: LLMResponse, action: EditAction) {
+        let cost = computeCost(provider: settings.provider, model: selectedModel ?? "", usage: response.usage)
+        let diff = DiffService.compactDiff(original: original, corrected: output)
+        candidateResults.append(CandidateResult(action: action, output: output, diff: diff, usage: response.usage, costUSD: cost))
+        appendHistory(HistoryDraft(original: original, output: output, diff: diff, action: action, usage: response.usage, costUSD: cost))
+        appendUsage(model: selectedModel ?? "", usage: response.usage, costUSD: cost)
+    }
+
+    func appendHistory(_ draft: HistoryDraft) {
+        guard let model = selectedModel else { return }
+        let entry = HistoryEntry(
+            provider: settings.provider,
+            model: model,
+            actionID: draft.action.id,
+            actionTitle: draft.action.title,
+            input: draft.original,
+            output: draft.output,
+            diff: draft.diff,
+            usage: draft.usage,
+            costUSD: draft.costUSD
+        )
+        history.insert(entry, at: 0)
+        history = Array(history.prefix(max(1, settings.historyLimit)))
+        HistoryStore.save(history, limit: settings.historyLimit)
+    }
+
+    func appendUsage(model: String, usage: TokenUsage, costUSD: Double?) {
+        let entry = UsageLedgerEntry(provider: settings.provider, model: model, usage: usage, costUSD: costUSD)
+        usageLedger.insert(entry, at: 0)
+        usageLedger = Array(usageLedger.prefix(500))
+        UsageLedgerStore.save(usageLedger)
+    }
+
+    func computeCost(provider: ProviderKind, model: String, usage: TokenUsage) -> Double? {
+        let key = PricingStore.key(provider: provider, model: model)
+        guard let pricing = pricing[key] else { return nil }
+        let inputCost = Double(usage.inputTokens) / 1_000_000 * pricing.inputPerMillion
+        let outputCost = Double(usage.outputTokens) / 1_000_000 * pricing.outputPerMillion
+        return inputCost + outputCost
+    }
+
+    func formatCost(_ value: Double?) -> String {
+        guard let value else { return "$—" }
+        if value == 0 { return "$0.0000" }
+        if value < 0.0001 { return String(format: "$%.6f", value) }
+        return String(format: "$%.4f", value)
+    }
+
+    static func costToday(from entries: [UsageLedgerEntry]) -> Double {
+        let calendar = Calendar.current
+        return entries.reduce(0) { total, entry in
+            guard calendar.isDateInToday(entry.timestamp), let cost = entry.costUSD else { return total }
+            return total + cost
+        }
+    }
+
+    func parseCorrection(_ text: String) -> (corrected: String, changed: Bool, confidence: Double)? {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        let jsonText: String
+        if let start = trimmed.firstIndex(of: "{"), let end = trimmed.lastIndex(of: "}"), start <= end {
+            jsonText = String(trimmed[start...end])
+        } else {
+            jsonText = trimmed
+        }
+        guard let data = jsonText.data(using: .utf8),
+              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let corrected = obj["corrected"] as? String else { return nil }
+        let changed = obj["changed"] as? Bool ?? (corrected != inputText)
+        let confidence = obj["confidence"] as? Double ?? 0.5
+        return (corrected, changed, confidence)
+    }
+}
