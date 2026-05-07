@@ -47,28 +47,24 @@ In Settings, pick a provider and click **Refresh** to load its model list. Be un
 
 `Cmd+Shift+Space` is not Spotlight (`Cmd+Space`) or the emoji viewer (`Ctrl+Cmd+Space`); a few apps may bind it but it's generally safe.
 
-## Modes
+## Modes / Templates
+
+Modes are just saved prompt Templates, for reuse. And Freeform is to manual input.
 
 Built-in: Correct, Typos & Grammar, Improve Writing, Translate, Simplify, Summarize, Bullets, Better way of saying, Make this Tweet Fit, Generate 3 variations, How to respond 3 ways, Caveman, **Freeform**.
 
-**Freeform** is special — pressing Enter opens a focused popup; type your instruction, Enter again, the result applies. The previous prompt is preserved between runs (Enter + Enter to repeat).
+## Features
 
-Edit/rename/disable modes and assign per-mode shortcuts in Settings. Stored in `~/.retypo-air/modes.json`.
-
-## Candidates panel (`Cmd+D`)
-
-Floats above the editor. Two states:
-
-- **Empty** (mode picker): Tab/arrows to a mode, Enter to run it without replacing your draft.
-- **Filled** (after `Cmd+Shift+Enter` runs all modes): browse outputs and diffs side-by-side, Enter applies one to the editor, Esc returns to the picker.
-
-## Layouts and themes
-
-- **Inline diff** (default): result replaces input, changed words highlighted with a subtle green underline (word-level LCS diff).
-- **Stacked**: input above, result/diff below.
-- Themes: **Glass** or **Lighter** (mostly transparent).
-
-If *Show on active screen bottom* is on, `Cmd+Shift+Space` centers the panel near the bottom of the screen under the cursor (≈⅓ width); height is preserved across screens.
+- Selected-text import
+- Toggle Mode window (`Cmd+D`), select Prompt Templates with arrows, Enter to run
+- Inline Diff highlighting editted text
+- two themes Glass, Lighter (almost transparent)
+- Show on active screen bottom optional
+- Save/restore history
+- Cost by session/day stats
+- WPM and Chars Count stats
+- Undo/Redo
+- Prompt Templates
 
 ## Files (`~/.retypo-air/`)
 
@@ -83,13 +79,7 @@ If *Show on active screen bottom* is on, `Cmd+Shift+Space` centers the panel nea
 | `draft-history.json` | Draft snapshots |
 | `import-debug.log` | Selection-import diagnostics |
 
-History limit configurable in Settings (10 / 50 / 200). Cost defaults are seeded for common OpenAI / Anthropic / Groq models; OpenRouter pricing is parsed from its `/models` response. Missing pricing shows `$—`.
-
-Verify pricing against provider docs if precision matters: [OpenAI](https://platform.openai.com/docs/pricing) · [Anthropic](https://docs.anthropic.com/en/docs/about-claude/pricing) · [Groq](https://groq.com/pricing) · [OpenRouter](https://openrouter.ai/docs/api-reference/list-available-models).
-
-## Selected-text import (experimental)
-
-When you trigger `Cmd+Shift+Space` from another app, Retypo tries to grab text in this priority order:
+## Selected-text import precedence
 
 1. **Live selection** via the Accessibility API (works in native macOS apps; no clipboard touched).
 2. **Synthetic `Cmd+C`** via the AX-pressed Copy menu, then the clipboard is read and restored (works in terminals / TUIs that expose copy).
@@ -97,7 +87,9 @@ When you trigger `Cmd+Shift+Space` from another app, Retypo tries to grab text i
 
 If a draft already exists, Retypo asks before replacing. If everything fails, check `~/.retypo-air/import-debug.log`.
 
-## Quality gates
+## Contribution / Quality gates
+
+Contributions are welcome, be aware of quality gates
 
 Pre-push hook runs `bin/quality` — SwiftLint + Periphery + tests + coverage gate, all ratcheted from `quality_thresholds.json`. See `QUALITY.md` for what's measured and the playbook this follows.
 
