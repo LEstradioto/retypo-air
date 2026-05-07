@@ -19,6 +19,7 @@ require() { command -v "$1" >/dev/null 2>&1 || { echo "missing tool: $1 (brew in
 require swiftlint
 require periphery
 require python3
+require xcrun
 
 echo "==> SwiftLint"
 swiftlint lint --reporter json > "$OUT/swiftlint.json" 2>/dev/null || true
@@ -26,55 +27,85 @@ swiftlint lint --reporter json > "$OUT/swiftlint.json" 2>/dev/null || true
 echo "==> Periphery"
 periphery scan --format json > "$OUT/periphery.json" 2>/dev/null || true
 
-python3 - "$THRESHOLDS" "$OUT/swiftlint.json" "$OUT/periphery.json" <<'PY'
+echo "==> Tests + coverage"
+if ! swift test --enable-code-coverage > "$OUT/swift-test.log" 2>&1; then
+    echo "  swift test FAILED — see $OUT/swift-test.log"
+    exit 1
+fi
+
+ARCH="$(uname -m | sed 's/x86_64/x86_64/;s/arm64/arm64/')"
+PROFDATA=".build/${ARCH}-apple-macosx/debug/codecov/default.profdata"
+TESTBIN=".build/${ARCH}-apple-macosx/debug/RetypoAirPackageTests.xctest/Contents/MacOS/RetypoAirPackageTests"
+if [ ! -f "$PROFDATA" ] || [ ! -f "$TESTBIN" ]; then
+    echo "  coverage artifacts missing; skipping coverage gate"
+    echo '{"line_coverage_percent": 0}' > "$OUT/coverage.json"
+else
+    xcrun llvm-cov report "$TESTBIN" \
+        -instr-profile="$PROFDATA" \
+        -ignore-filename-regex='(Tests|\.build)' \
+        > "$OUT/coverage.txt" 2>/dev/null || true
+    python3 - "$OUT/coverage.txt" > "$OUT/coverage.json" <<'PY'
+import sys, json, re
+text = open(sys.argv[1]).read()
+total = next((l for l in text.splitlines() if l.strip().startswith("TOTAL")), "")
+nums = re.findall(r"([\d.]+)%", total)
+# Columns: region%, function%, line%, branch%
+line_pct = float(nums[2]) if len(nums) >= 3 else 0.0
+print(json.dumps({"line_coverage_percent": line_pct}))
+PY
+fi
+
+python3 - "$THRESHOLDS" "$OUT/swiftlint.json" "$OUT/periphery.json" "$OUT/coverage.json" <<'PY'
 import json, sys
 
-thresholds_path, sl_path, ph_path = sys.argv[1], sys.argv[2], sys.argv[3]
+thresholds_path, sl_path, ph_path, cov_path = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
 T = json.load(open(thresholds_path))
-sl = json.load(open(sl_path)) if open(sl_path).read(1) else []
-# rewind: re-read since we consumed a byte for the truthy check
 sl = json.load(open(sl_path))
 ph = json.load(open(ph_path))
+cov = json.load(open(cov_path))
 
-# Tally SwiftLint by rule_id
 from collections import Counter
 rules = Counter(v["rule_id"] for v in sl)
 total_warnings = len(sl)
-
-# Tally Periphery
 unused = len(ph)
+line_pct = cov.get("line_coverage_percent", 0.0)
 
+# Tracked metrics: (name, current, limit, op)
+#   op="<=": current must be <= limit  (lint/periphery counts: lower is better)
+#   op=">=": current must be >= limit  (coverage: higher is better)
 tracked = [
-    ("cyclomatic_complexity",     rules.get("cyclomatic_complexity", 0),     T["swiftlint"]["cyclomatic_complexity"]),
-    ("function_body_length",      rules.get("function_body_length", 0),      T["swiftlint"]["function_body_length"]),
-    ("type_body_length",          rules.get("type_body_length", 0),          T["swiftlint"]["type_body_length"]),
-    ("file_length",               rules.get("file_length", 0),               T["swiftlint"]["file_length"]),
-    ("function_parameter_count",  rules.get("function_parameter_count", 0),  T["swiftlint"]["function_parameter_count"]),
-    ("force_unwrapping",          rules.get("force_unwrapping", 0),          T["swiftlint"]["force_unwrapping"]),
-    ("swiftlint_total",           total_warnings,                            T["swiftlint"]["total_warnings"]),
-    ("periphery_unused",          unused,                                    T["periphery"]["unused_declarations"]),
+    ("cyclomatic_complexity",     rules.get("cyclomatic_complexity", 0),     T["swiftlint"]["cyclomatic_complexity"],     "<="),
+    ("function_body_length",      rules.get("function_body_length", 0),      T["swiftlint"]["function_body_length"],      "<="),
+    ("type_body_length",          rules.get("type_body_length", 0),          T["swiftlint"]["type_body_length"],          "<="),
+    ("file_length",               rules.get("file_length", 0),               T["swiftlint"]["file_length"],               "<="),
+    ("function_parameter_count",  rules.get("function_parameter_count", 0),  T["swiftlint"]["function_parameter_count"],  "<="),
+    ("force_unwrapping",          rules.get("force_unwrapping", 0),          T["swiftlint"]["force_unwrapping"],          "<="),
+    ("force_cast",                rules.get("force_cast", 0),                T["swiftlint"].get("force_cast", 0),         "<="),
+    ("force_try",                 rules.get("force_try", 0),                 T["swiftlint"].get("force_try", 0),          "<="),
+    ("swiftlint_total",           total_warnings,                            T["swiftlint"]["total_warnings"],            "<="),
+    ("periphery_unused",          unused,                                    T["periphery"]["unused_declarations"],       "<="),
+    ("line_coverage_percent",     round(line_pct, 2),                        T.get("coverage", {}).get("line_coverage_percent_min", 0.0), ">="),
 ]
 
 print()
 print("Quality gates")
-print("=" * 60)
-print(f"{'metric':<30} {'now':>6}  {'<=':>4} {'limit':>6}  {'':>4}")
-print("-" * 60)
+print("=" * 64)
+print(f"{'metric':<32} {'now':>8}  {'op':>2} {'limit':>8}  {'':>4}")
+print("-" * 64)
 ok = True
-for name, now, limit in tracked:
-    sign = "OK" if now <= limit else "FAIL"
-    if now > limit:
-        ok = False
-    arrow = "<=" if now <= limit else " >"
-    print(f"{name:<30} {now:>6}  {arrow:>4} {limit:>6}  {sign:>4}")
-print("-" * 60)
+for name, now, limit, op in tracked:
+    passed = (now <= limit) if op == "<=" else (now >= limit)
+    sign = "OK" if passed else "FAIL"
+    if not passed: ok = False
+    print(f"{name:<32} {now:>8}  {op:>2} {limit:>8}  {sign:>4}")
+print("-" * 64)
 if ok:
     n = len(tracked)
     print(f"{n}/{n} gates passed.")
     sys.exit(0)
 else:
-    failures = [n for n, now, lim in tracked if now > lim]
+    failures = [name for name, now, lim, op in tracked if (op == '<=' and now > lim) or (op == '>=' and now < lim)]
     print(f"FAILED gates: {', '.join(failures)}")
-    print("If improvement was intentional and you LOWERED counts, run `bin/quality-bump`.")
+    print("If improvement was intentional, run `bin/quality-bump`.")
     sys.exit(1)
 PY
