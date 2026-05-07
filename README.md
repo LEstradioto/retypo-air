@@ -2,6 +2,8 @@
 
 Tiny macOS floating textbox. Run saved prompts on selected text (from any app or manual input), auto-copy the result.
 
+![Retypo Air glass panel docked at the bottom of the screen, showing inline diff highlights over a TextEdit document.](glass-bottom-1-main.png)
+
 > [!IMPORTANT]
 > Personal, opinionated, 100% AI-assisted. Use at your own risk.
 >
@@ -23,6 +25,38 @@ scripts/dev-app.sh         # builds + opens build-dev/RetypoAir-dev.app
 ```
 
 In Settings, pick a provider and click Refresh to load its models.
+
+## Features
+
+- Multi-provider: Groq, Anthropic, OpenAI, OpenRouter. Models discovered per provider, cached.
+- Candidates overlay (`Cmd+D`): mode picker when empty (arrows + Enter run any mode without replacing draft); after `Cmd+Shift+Enter`, browse all-mode outputs side-by-side, Enter applies one.
+- Inline diff layout: result replaces input, changed words underlined in subtle green (word-level LCS). Or Stacked: input top, result/diff bottom.
+- Themes: Glass (default), Lighter (mostly transparent).
+- Optional show-on-active-screen-bottom: `Cmd+Shift+Space` centers panel near cursor's screen.
+- Per-mode and per-model shortcuts in Settings.
+- History: every run logs input, output, diff, model, prompt, tokens, cost. Limit 10/50/200, restorable.
+- Cost tracking: last, session, today USD. Tokens times editable per-model pricing.
+- Footer stats: WPM (warm-up + pause-reset), changed-word delta, char count, status.
+- Auto-save drafts with realtime recovery + snapshots. Undo/redo (`Cmd+Z`, `Shift+Cmd+Z`).
+- Auto-copy on run (toggleable). Optional hide-after-copy.
+
+## Modes (saved prompts)
+
+A mode is a saved system prompt. **Freeform** is special: type the prompt live each run (popup on Enter, type, Enter to apply).
+
+Built-in: Correct, Typos & Grammar, Improve Writing, Translate, Simplify, Summarize, Bullets, Better way of saying, Make this Tweet Fit, Generate 3 variations, How to respond 3 ways, Caveman, **Freeform**.
+
+Edit, rename, disable, shortcut-bind in Settings. Stored in `~/.retypo-air/modes.json`.
+
+## Selection import precedence
+
+When `Cmd+Shift+Space` from another app:
+
+1. **AX selection**. Fast, no clipboard touched. Native macOS apps.
+2. **Synthetic `Cmd+C`** via AX-pressed Copy menu. Clipboard read then restored. Terminals, TUIs.
+3. **Existing clipboard**. Whatever was already copied.
+
+If a draft already exists, asks before replacing. Failures: `~/.retypo-air/import-debug.log`.
 
 ## Keyboard
 
@@ -46,38 +80,6 @@ In Settings, pick a provider and click Refresh to load its models.
 | `Cmd+Q` | Quit |
 
 `Cmd+Shift+Space` is not Spotlight (`Cmd+Space`) or emoji viewer (`Ctrl+Cmd+Space`). A few apps may bind it but it's usually safe.
-
-## Modes (saved prompts)
-
-A mode is a saved system prompt. **Freeform** is special: type the prompt live each run (popup on Enter, type, Enter to apply).
-
-Built-in: Correct, Typos & Grammar, Improve Writing, Translate, Simplify, Summarize, Bullets, Better way of saying, Make this Tweet Fit, Generate 3 variations, How to respond 3 ways, Caveman, **Freeform**.
-
-Edit, rename, disable, shortcut-bind in Settings. Stored in `~/.retypo-air/modes.json`.
-
-## Selection import precedence
-
-When `Cmd+Shift+Space` from another app:
-
-1. **AX selection**. Fast, no clipboard touched. Native macOS apps.
-2. **Synthetic `Cmd+C`** via AX-pressed Copy menu. Clipboard read then restored. Terminals, TUIs.
-3. **Existing clipboard**. Whatever was already copied.
-
-If a draft already exists, asks before replacing. Failures: `~/.retypo-air/import-debug.log`.
-
-## Features
-
-- Multi-provider: Groq, Anthropic, OpenAI, OpenRouter. Models discovered per provider, cached.
-- Candidates overlay (`Cmd+D`): mode picker when empty (arrows + Enter run any mode without replacing draft); after `Cmd+Shift+Enter`, browse all-mode outputs side-by-side, Enter applies one.
-- Inline diff layout: result replaces input, changed words underlined in subtle green (word-level LCS). Or Stacked: input top, result/diff bottom.
-- Themes: Glass (default), Lighter (mostly transparent).
-- Optional show-on-active-screen-bottom: `Cmd+Shift+Space` centers panel near cursor's screen.
-- Per-mode and per-model shortcuts in Settings.
-- History: every run logs input, output, diff, model, prompt, tokens, cost. Limit 10/50/200, restorable.
-- Cost tracking: last, session, today USD. Tokens times editable per-model pricing.
-- Footer stats: WPM (warm-up + pause-reset), changed-word delta, char count, status.
-- Auto-save drafts with realtime recovery + snapshots. Undo/redo (`Cmd+Z`, `Shift+Cmd+Z`).
-- Auto-copy on run (toggleable). Optional hide-after-copy.
 
 ## Files (`~/.retypo-air/`)
 
