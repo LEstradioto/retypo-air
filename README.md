@@ -11,6 +11,12 @@ Tiny macOS floating textbox. Run saved prompts on selected text (from any app or
 >
 > macOS only. No `.app` installer or signing, you run the dev script. Local-first: settings, drafts, history, API keys all live under `~/.retypo-air/`. No telemetry.
 
+## Why
+
+I keep editing more of my writing through LLMs. Tried voice (Handy is installed), kept drifting back to typing: voice felt like it was sending too much noise into the model. Probably because I write better than I think out loud, and I still don't write well enough.
+
+Other reason: typing long prompts into CLI agents like Codex or Claude Code, then losing the whole thing to a stray keystroke that wipes the input, a crash, or accidentally killing the terminal. Not undoable, gone. Retypo writes every keystroke to `draft.txt` and snapshots up to 20 paused-state versions of the draft, so the worst case is reopening the panel and picking a snapshot from Settings.
+
 ## Caveats
 
 - macOS 13+, Swift 5.9+, Xcode CLT or Xcode.
@@ -28,17 +34,24 @@ In Settings, pick a provider and click Refresh to load its models.
 
 ## Features
 
-- Multi-provider: Groq, Anthropic, OpenAI, OpenRouter. Models discovered per provider, cached.
-- Candidates overlay (`Cmd+D`): mode picker when empty (arrows + Enter run any mode without replacing draft); after `Cmd+Shift+Enter`, browse all-mode outputs side-by-side, Enter applies one.
-- Inline diff layout: result replaces input, changed words underlined in subtle green (word-level LCS). Or Stacked: input top, result/diff bottom.
-- Themes: Glass (default), Lighter (mostly transparent).
-- Optional show-on-active-screen-bottom: `Cmd+Shift+Space` centers panel near cursor's screen.
-- Per-mode and per-model shortcuts in Settings.
-- History: every run logs input, output, diff, model, prompt, tokens, cost. Limit 10/50/200, restorable.
-- Cost tracking: last, session, today USD. Tokens times editable per-model pricing.
-- Footer stats: WPM (warm-up + pause-reset), changed-word delta, char count, status.
-- Auto-save drafts with realtime recovery + snapshots. Undo/redo (`Cmd+Z`, `Shift+Cmd+Z`).
-- Auto-copy on run (toggleable). Optional hide-after-copy.
+- One global shortcut. `Cmd+Shift+Space` in, edit, out.
+- Easy go-and-back: hide restores focus to the app you came from.
+- Selection import from any app.
+- 13 pre-made prompts. Freeform mode: type the prompt live each run.
+- Auto-copy and auto-correct.
+- Inline or stacked diff. Changed words underlined green.
+- History, restorable. Don't lose your drafts.
+- Undo/redo.
+- Whitespace and newlines trimmed off LLM replies.
+- macOS native spellcheck still works underneath.
+- 2 Themes: Glass, Lighter. 
+- Always-on-top.
+- Automatic show on active screen for multi-screen setups.
+- Multi-provider: Groq, Anthropic, OpenAI, OpenRouter.
+- Per-mode and per-model shortcuts.
+- Cost tracking: last, session, today. Editable per-model pricing.
+- Footer stats: WPM, changed-word delta, char count.
+- Auto-correct skips short text, code fences, shell commands, symbol-heavy lines. So it never rewrites a command you're typing.
 
 ## Modes (saved prompts)
 
