@@ -41,8 +41,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             switch action {
             case .togglePanel:
                 self?.togglePanel()
-            case .importSelection:
-                self?.importSelectedTextFromFrontmostApp(allowClipboardFallback: true)
             }
         }
         hotkeys?.register()
@@ -83,8 +81,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             hidePanelAndFocusPrevious()
         } else if let frontmost = NSWorkspace.shared.frontmostApplication,
                   frontmost.processIdentifier != NSRunningApplication.current.processIdentifier {
-            DebugLog.log("togglePanel from external app; attempting fast selected-text import before show")
-            importSelectedTextFromFrontmostApp(allowClipboardFallback: false)
+            DebugLog.log("togglePanel from external app; attempting selected-text import")
+            importSelectedTextFromFrontmostApp(allowClipboardFallback: true)
         } else {
             showPanel()
         }

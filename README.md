@@ -1,57 +1,35 @@
 # Retypo Air
 
-A tiny macOS floating textbox for drafting prompts, fixing rough typing with an LLM, and copying the polished text to the clipboard.
+A tiny macOS floating textbox for easy run pre-configured prompts to fix the text you select from any app (or manual input) and auto-clipboard the polished output.
 
 > [!IMPORTANT]
-> **This is a personal tool, 100% AI-assisted ("vibe coded"). Use at your own risk.**
+> **This is a personal opiniated 100% AI-assisted. Use at your own risk.**
 >
-> I built it to scratch my own itch: one global shortcut to open a small textbox, snappy keyboard navigation, edit with saved LLM prompts (or type a one-off prompt), result on the clipboard. That's it.
+> I built it to me: global shortcut > small textbox > snappy navigation > use prompts > result to clipboard. That's it.
 >
-> macOS-only. No `.app` installer or signing — you run the dev script yourself. Local-first: settings, drafts, history, and API keys live under `~/.retypo-air/`. No telemetry.
+> macOS-only. No `.app` installer or signing, run the dev script yourself. Local-first: settings, drafts, history, and API keys live under `~/.retypo-air/`. No telemetry.
 
 ## Caveats
 
 - macOS 13+, Swift 5.9+, Xcode CLT or Xcode.
-- The selected-text import feature (`Cmd+Shift+Enter` while another app is focused) needs macOS Accessibility permission — grant it once when prompted.
-- Bring your own API key; at least one of Groq, Anthropic, OpenAI, or OpenRouter.
+- The selected-text import feature (`Cmd+Shift+Enter` while another app is focused) needs macOS Accessibility permission, grant it once when prompted (you should select the generated RetypoAir-dev.app at the ./build-dev folder)
+- Bring your own API key, at least one of Groq, Anthropic, OpenAI, or OpenRouter.
 
 ## Quick start
 
 ```bash
-cp .env.example .env       # add at least one *_API_KEY
+cp .env.example .env       # add at least one *_API_KEY - Loaded in this order (first wins): existing shell env → `.env` in CWD → `~/.retypo-air/.env`.
 scripts/dev-app.sh         # builds + opens build-dev/RetypoAir-dev.app
 ```
 
-Grant **Retypo Air Dev** under System Settings → Privacy & Security → Accessibility when prompted (only required for selection import).
-
-Reload after code changes:
-
-```bash
-osascript -e 'tell application id "app.retypoair.dev" to quit'
-scripts/dev-app.sh
-```
-
-`swift run --disable-sandbox RetypoAir` works too, but Accessibility permission is sticky-er for an `.app` identity.
-
-## API keys
-
-Loaded in this order (first wins): existing shell env → `.env` in CWD → `~/.retypo-air/.env`.
-
-```
-GROQ_API_KEY=
-ANTHROPIC_API_KEY=
-OPENAI_API_KEY=
-OPENROUTER_API_KEY=
-```
-
-In Settings, pick a provider and click **Refresh** to load its model list.
+In Settings, pick a provider and click **Refresh** to load its model list. Be unstoppable!
 
 ## Keyboard
 
 | Shortcut | Action |
 | --- | --- |
-| `Cmd+Shift+Space` | Show / hide the panel (global) |
-| `Cmd+Shift+Enter` | Other app focused: import its selection. Retypo focused: run all enabled modes |
+| `Cmd+Shift+Space` | Show / hide the panel (global). When triggered from another app, also imports its selection / clipboard |
+| `Cmd+Shift+Enter` | Run all enabled modes against the current draft (Retypo focused) |
 | `Enter` | Run current mode (auto-copies result) |
 | `Shift+Enter` | New line |
 | `Esc` | Hide panel |
@@ -111,7 +89,13 @@ Verify pricing against provider docs if precision matters: [OpenAI](https://plat
 
 ## Selected-text import (experimental)
 
-`Cmd+Shift+Enter` while another app is focused: Retypo sends a temporary `Cmd+C`, reads the clipboard, restores your previous clipboard, and pastes the selection into the editor. If a draft already exists it asks before replacing. Terminals / TUIs may need Accessibility permission; if it fails, check `~/.retypo-air/import-debug.log`. Alternative hotkey: `Cmd+Opt+Shift+I`.
+When you trigger `Cmd+Shift+Space` from another app, Retypo tries to grab text in this priority order:
+
+1. **Live selection** via the Accessibility API (works in native macOS apps; no clipboard touched).
+2. **Synthetic `Cmd+C`** via the AX-pressed Copy menu, then the clipboard is read and restored (works in terminals / TUIs that expose copy).
+3. **Existing clipboard contents** — whatever you already had copied.
+
+If a draft already exists, Retypo asks before replacing. If everything fails, check `~/.retypo-air/import-debug.log`.
 
 ## Quality gates
 

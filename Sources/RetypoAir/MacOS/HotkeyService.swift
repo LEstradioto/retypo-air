@@ -4,7 +4,6 @@ import Carbon
 final class HotkeyService {
     enum Action {
         case togglePanel
-        case importSelection
     }
 
     private let handler: (Action) -> Void
@@ -29,9 +28,6 @@ final class HotkeyService {
 
         let signature = OSType(UInt32(ascii: "RTYP"))
         register(keyCode: UInt32(kVK_Space), modifiers: UInt32(cmdKey | shiftKey), id: 1, signature: signature)
-        register(keyCode: UInt32(kVK_Return), modifiers: UInt32(cmdKey | shiftKey), id: 2, signature: signature)
-        register(keyCode: UInt32(kVK_ANSI_KeypadEnter), modifiers: UInt32(cmdKey | shiftKey), id: 3, signature: signature)
-        register(keyCode: UInt32(kVK_ANSI_I), modifiers: UInt32(cmdKey | shiftKey | optionKey), id: 4, signature: signature)
     }
 
     deinit {
@@ -62,14 +58,7 @@ final class HotkeyService {
             &hotKeyID
         )
         guard status == noErr else { return nil }
-        switch hotKeyID.id {
-        case 1:
-            return .togglePanel
-        case 2, 3, 4:
-            return .importSelection
-        default:
-            return nil
-        }
+        return hotKeyID.id == 1 ? .togglePanel : nil
     }
 }
 

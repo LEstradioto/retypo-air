@@ -3,20 +3,20 @@
   "_captured_at": "2026-05-07",
   "swiftlint": {
     "cyclomatic_complexity": 3,
-    "function_body_length": 18,
+    "function_body_length": 16,
     "type_body_length": 7,
     "file_length": 8,
     "function_parameter_count": 0,
     "force_unwrapping": 0,
     "force_cast": 0,
     "force_try": 0,
-    "total_warnings": 45
+    "total_warnings": 43
   },
   "periphery": {
     "unused_declarations": 4
   },
   "coverage": {
-    "line_coverage_percent_min": 7.68
+    "line_coverage_percent_min": 7.76
   },
   "_skipped": {
     "branch_coverage": "Apple platforms expose only line coverage natively",

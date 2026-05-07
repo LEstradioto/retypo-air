@@ -12,25 +12,37 @@ extension AppDelegate {
 
     func importSelectedTextFromFrontmostApp(allowClipboardFallback: Bool) {
         DebugLog.log("import begin nsAppActive=\(NSApp.isActive)")
-        if NSApp.isActive {
-            DebugLog.log("import skipped because Retypo is active; running all modes")
-            Task { [weak state] in await state?.runAllEnabledModes() }
-            return
-        }
         guard let sourceApplication = resolveExternalSource() else { return }
         previousApplication = sourceApplication
         let sourceName = sourceApplication.localizedName ?? "frontmost app"
         DebugLog.log("import source name=\(sourceName) bundle=\(sourceApplication.bundleIdentifier ?? "nil") pid=\(sourceApplication.processIdentifier)")
         let trusted = requestAccessibilityTrustIfNeeded()
         DebugLog.log("accessibility trusted=\(trusted)")
+        // Priority 1: live AX selection — no clipboard touched.
         if trusted, importViaAXSelectedText(application: sourceApplication, sourceName: sourceName) { return }
         guard allowClipboardFallback else {
-            DebugLog.log("fast import found no AXSelectedText; opening panel without clipboard fallback")
+            if importExistingClipboard(sourceName: sourceName) { return }
             showPanel()
             state?.status = "No selected text imported"
             return
         }
+        // Priority 2: synthetic Cmd+C via AX-pressed Copy menu (terminals etc.).
+        // Falls through to Priority 3 (existing clipboard) on failure inside `failImport`.
         startClipboardPoll(sourceApplication: sourceApplication, sourceName: sourceName, trustedForAccessibility: trusted)
+    }
+
+    /// Priority 3 fallback: import whatever the user already has on the
+    /// system clipboard. Returns true if anything was imported.
+    private func importExistingClipboard(sourceName: String) -> Bool {
+        let snapshot = ClipboardService.snapshot()
+        guard let text = snapshot.string?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty else {
+            return false
+        }
+        DebugLog.log("import fallback: using existing clipboard length=\(text.count)")
+        let needsConfirmation = state?.receiveExternalImport(text, source: "\(sourceName) (clipboard)") ?? false
+        showPanel()
+        if needsConfirmation { auxiliaryPanels?.setImportPromptVisible(true) }
+        return true
     }
 
     private func resolveExternalSource() -> NSRunningApplication? {
@@ -120,6 +132,15 @@ extension AppDelegate {
 
     private func failImport(ctx: ImportPollContext) {
         DebugLog.log("import failed: clipboard did not contain selected text")
+        // Priority 3: original clipboard (snapshot taken before our synthetic
+        // copy primed the marker). Use whatever the user already had.
+        if let original = ctx.originalClipboard.string?.trimmingCharacters(in: .whitespacesAndNewlines), !original.isEmpty {
+            DebugLog.log("import fallback: using original clipboard length=\(original.count)")
+            let needsConfirmation = state?.receiveExternalImport(original, source: "\(ctx.sourceName) (clipboard)") ?? false
+            showPanel()
+            if needsConfirmation { auxiliaryPanels?.setImportPromptVisible(true) }
+            return
+        }
         showPanel()
         let hint = ctx.trustedForAccessibility ? "" : " Grant Accessibility permission to Retypo Air, then try again."
         state?.status = "No selected text imported.\(hint)"
