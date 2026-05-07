@@ -23,20 +23,23 @@ struct EditAction: Identifiable, Hashable, Codable {
 }
 
 enum EditActionStore {
-    static var fileURL: URL { SettingsStore.directory.appendingPathComponent("modes.json") }
+    private static let file = PersistedFile<[EditAction]>(
+        url: AppFiles.url("modes.json"),
+        fallback: EditAction.defaults
+    )
 
     static func load() -> [EditAction] {
-        do {
-            let data = try Data(contentsOf: fileURL)
-            let actions = try JSONDecoder().decode([EditAction].self, from: data)
-            let merged = mergeDefaults(into: actions)
-            if merged != actions { save(merged) }
-            return merged.isEmpty ? EditAction.defaults : merged
-        } catch {
+        let stored = file.load()
+        if stored.isEmpty {
             save(EditAction.defaults)
             return EditAction.defaults
         }
+        let merged = mergeDefaults(into: stored)
+        if merged != stored { save(merged) }
+        return merged
     }
+
+    static func save(_ actions: [EditAction]) { file.save(actions) }
 
     private static func mergeDefaults(into actions: [EditAction]) -> [EditAction] {
         guard !actions.isEmpty else { return EditAction.defaults }
@@ -46,17 +49,5 @@ enum EditActionStore {
             result.append(action)
         }
         return result
-    }
-
-    static func save(_ actions: [EditAction]) {
-        do {
-            try FileManager.default.createDirectory(at: SettingsStore.directory, withIntermediateDirectories: true)
-            let encoder = JSONEncoder()
-            encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-            let data = try encoder.encode(actions)
-            try data.write(to: fileURL, options: [.atomic])
-        } catch {
-            fputs("RetypoAir modes save failed: \(error)\n", stderr)
-        }
     }
 }

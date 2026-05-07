@@ -35,55 +35,25 @@ struct HistoryEntry: Identifiable, Codable, Hashable {
 }
 
 enum PricingStore {
-    static var fileURL: URL { SettingsStore.directory.appendingPathComponent("pricing.json") }
+    private static let file = PersistedFile<[String: ModelPricing]>(
+        url: AppFiles.url("pricing.json"),
+        fallback: [:]
+    )
 
-    static func load() -> [String: ModelPricing] {
-        do {
-            let data = try Data(contentsOf: fileURL)
-            return try JSONDecoder().decode([String: ModelPricing].self, from: data)
-        } catch {
-            save([:])
-            return [:]
-        }
-    }
-
-    static func save(_ pricing: [String: ModelPricing]) {
-        do {
-            try FileManager.default.createDirectory(at: SettingsStore.directory, withIntermediateDirectories: true)
-            let encoder = JSONEncoder()
-            encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-            let data = try encoder.encode(pricing)
-            try data.write(to: fileURL, options: [.atomic])
-        } catch {
-            fputs("RetypoAir pricing save failed: \(error)\n", stderr)
-        }
-    }
-
+    static func load() -> [String: ModelPricing] { file.load() }
+    static func save(_ pricing: [String: ModelPricing]) { file.save(pricing) }
     static func key(provider: ProviderKind, model: String) -> String { "\(provider.rawValue)::\(model)" }
 }
 
 enum HistoryStore {
-    static var fileURL: URL { SettingsStore.directory.appendingPathComponent("history.json") }
+    private static let file = PersistedFile<[HistoryEntry]>(
+        url: AppFiles.url("history.json"),
+        fallback: []
+    )
 
-    static func load() -> [HistoryEntry] {
-        do {
-            let data = try Data(contentsOf: fileURL)
-            return try JSONDecoder().decode([HistoryEntry].self, from: data)
-        } catch {
-            return []
-        }
-    }
-
+    static func load() -> [HistoryEntry] { file.load() }
     static func save(_ entries: [HistoryEntry], limit: Int = 10) {
-        do {
-            try FileManager.default.createDirectory(at: SettingsStore.directory, withIntermediateDirectories: true)
-            let encoder = JSONEncoder()
-            encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-            let data = try encoder.encode(Array(entries.prefix(max(1, limit))))
-            try data.write(to: fileURL, options: [.atomic])
-        } catch {
-            fputs("RetypoAir history save failed: \(error)\n", stderr)
-        }
+        file.save(Array(entries.prefix(max(1, limit))))
     }
 }
 
@@ -97,27 +67,14 @@ struct UsageLedgerEntry: Identifiable, Codable, Hashable {
 }
 
 enum UsageLedgerStore {
-    static var fileURL: URL { SettingsStore.directory.appendingPathComponent("usage-ledger.json") }
+    private static let file = PersistedFile<[UsageLedgerEntry]>(
+        url: AppFiles.url("usage-ledger.json"),
+        fallback: []
+    )
 
-    static func load() -> [UsageLedgerEntry] {
-        do {
-            let data = try Data(contentsOf: fileURL)
-            return try JSONDecoder().decode([UsageLedgerEntry].self, from: data)
-        } catch {
-            return []
-        }
-    }
-
+    static func load() -> [UsageLedgerEntry] { file.load() }
     static func save(_ entries: [UsageLedgerEntry]) {
-        do {
-            try FileManager.default.createDirectory(at: SettingsStore.directory, withIntermediateDirectories: true)
-            let encoder = JSONEncoder()
-            encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-            let data = try encoder.encode(Array(entries.prefix(500)))
-            try data.write(to: fileURL, options: [.atomic])
-        } catch {
-            fputs("RetypoAir usage ledger save failed: \(error)\n", stderr)
-        }
+        file.save(Array(entries.prefix(500)))
     }
 }
 
@@ -128,27 +85,14 @@ struct DraftSnapshot: Identifiable, Codable, Hashable {
 }
 
 enum DraftSnapshotStore {
-    static var fileURL: URL { SettingsStore.directory.appendingPathComponent("draft-history.json") }
+    private static let file = PersistedFile<[DraftSnapshot]>(
+        url: AppFiles.url("draft-history.json"),
+        fallback: []
+    )
 
-    static func load() -> [DraftSnapshot] {
-        do {
-            let data = try Data(contentsOf: fileURL)
-            return try JSONDecoder().decode([DraftSnapshot].self, from: data)
-        } catch {
-            return []
-        }
-    }
-
+    static func load() -> [DraftSnapshot] { file.load() }
     static func save(_ entries: [DraftSnapshot]) {
-        do {
-            try FileManager.default.createDirectory(at: SettingsStore.directory, withIntermediateDirectories: true)
-            let encoder = JSONEncoder()
-            encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-            let data = try encoder.encode(Array(entries.prefix(20)))
-            try data.write(to: fileURL, options: [.atomic])
-        } catch {
-            fputs("RetypoAir draft history save failed: \(error)\n", stderr)
-        }
+        file.save(Array(entries.prefix(20)))
     }
 }
 
@@ -167,8 +111,9 @@ struct PendingImport: Identifiable, Hashable {
     var source: String
 }
 
+/// Plain-text draft (not JSON, kept separate from the `PersistedFile<T>` family).
 enum DraftStore {
-    static var fileURL: URL { SettingsStore.directory.appendingPathComponent("draft.txt") }
+    static var fileURL: URL { AppFiles.url("draft.txt") }
 
     static func load() -> String {
         (try? String(contentsOf: fileURL, encoding: .utf8)) ?? ""
@@ -176,7 +121,7 @@ enum DraftStore {
 
     static func save(_ text: String) {
         do {
-            try FileManager.default.createDirectory(at: SettingsStore.directory, withIntermediateDirectories: true)
+            try FileManager.default.createDirectory(at: AppFiles.directory, withIntermediateDirectories: true)
             try text.write(to: fileURL, atomically: true, encoding: .utf8)
         } catch {
             fputs("RetypoAir draft save failed: \(error)\n", stderr)

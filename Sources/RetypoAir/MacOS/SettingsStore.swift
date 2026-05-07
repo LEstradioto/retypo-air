@@ -119,30 +119,14 @@ struct RetypoSettings: Codable, Equatable {
 }
 
 enum SettingsStore {
-    static var directory: URL {
-        FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".retypo-air", isDirectory: true)
-    }
+    /// Back-compat alias; new code should use `AppFiles.directory`.
+    static var directory: URL { AppFiles.directory }
 
-    static var fileURL: URL { directory.appendingPathComponent("settings.json") }
+    private static let file = PersistedFile<RetypoSettings>(
+        url: AppFiles.url("settings.json"),
+        fallback: RetypoSettings()
+    )
 
-    static func load() -> RetypoSettings {
-        do {
-            let data = try Data(contentsOf: fileURL)
-            return try JSONDecoder().decode(RetypoSettings.self, from: data)
-        } catch {
-            return RetypoSettings()
-        }
-    }
-
-    static func save(_ settings: RetypoSettings) {
-        do {
-            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-            let encoder = JSONEncoder()
-            encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-            let data = try encoder.encode(settings)
-            try data.write(to: fileURL, options: [.atomic])
-        } catch {
-            fputs("RetypoAir settings save failed: \(error)\n", stderr)
-        }
-    }
+    static func load() -> RetypoSettings { file.load() }
+    static func save(_ settings: RetypoSettings) { file.save(settings) }
 }
