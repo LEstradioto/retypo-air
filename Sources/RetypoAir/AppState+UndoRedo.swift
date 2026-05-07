@@ -1,30 +1,14 @@
 import Foundation
 import AppKit
 
-struct EditorSnapshot: Equatable {
-    var inputText: String
-    var correctedText: String
-    var outputText: String
-    var status: String
-    var diffText: String
-    var inlineHighlightRanges: [NSRange]
-    var candidateResults: [CandidateResult]
-    var showCandidateOverlay: Bool
-    var selectedCandidateIndex: Int
-    var wordsChangedLast: Int
-    var lastAutoSubmittedHash: Int?
-    var typingStartedAt: Date?
-}
-
 extension AppState {
     @discardableResult
     func undoEditorChange() -> Bool {
-        guard let snapshot = editorUndoStack.popLast() else {
+        guard let snapshot = editor.undo(current: currentEditorSnapshot()) else {
             status = "Nothing to undo"
             publishUndoRedoAvailability()
             return false
         }
-        editorRedoStack.append(currentEditorSnapshot())
         restoreEditorSnapshot(snapshot)
         status = "Undone"
         publishUndoRedoAvailability()
@@ -33,12 +17,11 @@ extension AppState {
 
     @discardableResult
     func redoEditorChange() -> Bool {
-        guard let snapshot = editorRedoStack.popLast() else {
+        guard let snapshot = editor.redo(current: currentEditorSnapshot()) else {
             status = "Nothing to redo"
             publishUndoRedoAvailability()
             return false
         }
-        editorUndoStack.append(currentEditorSnapshot())
         restoreEditorSnapshot(snapshot)
         status = "Redone"
         publishUndoRedoAvailability()
@@ -46,19 +29,13 @@ extension AppState {
     }
 
     func pushEditorUndoSnapshot() {
-        let snapshot = currentEditorSnapshot()
-        guard editorUndoStack.last != snapshot else { return }
-        editorUndoStack.append(snapshot)
-        if editorUndoStack.count > editorUndoLimit {
-            editorUndoStack.removeFirst(editorUndoStack.count - editorUndoLimit)
-        }
-        editorRedoStack.removeAll()
+        editor.pushSnapshot(currentEditorSnapshot())
         publishUndoRedoAvailability()
     }
 
     func publishUndoRedoAvailability() {
-        canUndoEditorChange = !editorUndoStack.isEmpty
-        canRedoEditorChange = !editorRedoStack.isEmpty
+        canUndoEditorChange = editor.canUndo
+        canRedoEditorChange = editor.canRedo
     }
 
     fileprivate func currentEditorSnapshot() -> EditorSnapshot {
@@ -91,6 +68,6 @@ extension AppState {
         lastAutoSubmittedHash = snapshot.lastAutoSubmittedHash
         typingStartedAt = snapshot.typingStartedAt ?? Date()
         DraftStore.save(inputText)
-        onCandidatesVisibilityChanged?(showCandidateOverlay)
+        host?.setCandidatesVisible(showCandidateOverlay)
     }
 }
