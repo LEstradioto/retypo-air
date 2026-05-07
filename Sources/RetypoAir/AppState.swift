@@ -4,7 +4,6 @@ import AppKit
 @MainActor
 final class AppState: ObservableObject {
     let footerFocusItemCount = 9
-    let editorUndoLimit = 50
 
     @Published var settings: RetypoSettings
     @Published var inputText: String = ""
@@ -37,12 +36,7 @@ final class AppState: ObservableObject {
     @Published var canRedoEditorChange = false
 
 
-    var onAlwaysOnTopChanged: ((Bool) -> Void)?
-    var onHideRequested: (() -> Void)?
-    var onShowRequested: (() -> Void)?
-    var onSettingsRequested: (() -> Void)?
-    var onCandidatesVisibilityChanged: ((Bool) -> Void)?
-    var onImportConfirmationChanged: ((Bool) -> Void)?
+    weak var host: PanelHost?
 
     let router = LLMRouter()
     let debouncer = Debouncer()
@@ -51,8 +45,7 @@ final class AppState: ObservableObject {
     var correctionGeneration = 0
     var suppressNextInputChange = false
     var typingStartedAt: Date?
-    var editorUndoStack: [EditorSnapshot] = []
-    var editorRedoStack: [EditorSnapshot] = []
+    var editor = EditorEngine(limit: 50)
 
     init(settings: RetypoSettings) {
         self.settings = settings
@@ -128,7 +121,7 @@ final class AppState: ObservableObject {
     }
 
     func requestHide() {
-        onHideRequested?()
+        host?.requestHide()
     }
 
     func toggleCandidateOverlay() {
@@ -141,10 +134,10 @@ final class AppState: ObservableObject {
 
     func setCandidateOverlayVisible(_ visible: Bool) {
         showCandidateOverlay = visible
-        onCandidatesVisibilityChanged?(visible)
+        host?.setCandidatesVisible(visible)
     }
 
     func requestSettings() {
-        onSettingsRequested?()
+        host?.requestSettings()
     }
 }

@@ -25,13 +25,13 @@ extension AppState {
         let text = pendingImport.text
         let source = pendingImport.source
         self.pendingImport = nil
-        onImportConfirmationChanged?(false)
+        host?.setImportConfirmationVisible(false)
         importExternalText(text, source: source)
     }
 
     func cancelPendingImport() {
         pendingImport = nil
-        onImportConfirmationChanged?(false)
+        host?.setImportConfirmationVisible(false)
         status = "Import cancelled"
     }
 
@@ -54,8 +54,8 @@ extension AppState {
     }
 
     func onInputChanged() {
-        if !suppressNextInputChange, !editorRedoStack.isEmpty {
-            editorRedoStack.removeAll()
+        if !suppressNextInputChange, editor.canRedo {
+            editor.dropRedo()
             publishUndoRedoAvailability()
         }
         if typingStartedAt == nil { typingStartedAt = Date() }

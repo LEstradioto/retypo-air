@@ -47,7 +47,7 @@ extension AppState {
 
     func toggleAlwaysOnTop() {
         settings.alwaysOnTop.toggle()
-        onAlwaysOnTopChanged?(settings.alwaysOnTop)
+        host?.setAlwaysOnTop(settings.alwaysOnTop)
         saveSettings()
     }
 
@@ -56,6 +56,6 @@ extension AppState {
         guard !value.isEmpty else { return }
         ClipboardService.copy(value)
         status = "Copied"
-        if settings.hideAfterCopy { onHideRequested?() }
+        if settings.hideAfterCopy { host?.requestHide() }
     }
 }

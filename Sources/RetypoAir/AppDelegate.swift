@@ -29,26 +29,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let auxiliaryPanels = AuxiliaryPanelController(mainPanel: panel, state: appState)
         self.auxiliaryPanels = auxiliaryPanels
 
-        wireStateCallbacks(appState, panel: panel)
+        appState.host = self
         registerHotkeys()
 
         showPanel()
         Task { await appState.refreshModelsIfPossible() }
-    }
-
-    private func wireStateCallbacks(_ appState: AppState, panel: FloatingPanel) {
-        appState.onAlwaysOnTopChanged = { [weak panel] enabled in
-            panel?.level = enabled ? .floating : .normal
-        }
-        appState.onHideRequested = { [weak self] in self?.hidePanelAndFocusPrevious() }
-        appState.onShowRequested = { [weak self] in self?.showPanel() }
-        appState.onSettingsRequested = { [weak self] in self?.auxiliaryPanels?.toggleSettings() }
-        appState.onCandidatesVisibilityChanged = { [weak self] visible in
-            self?.auxiliaryPanels?.setCandidatesVisible(visible)
-        }
-        appState.onImportConfirmationChanged = { [weak self] visible in
-            self?.auxiliaryPanels?.setImportPromptVisible(visible)
-        }
     }
 
     private func registerHotkeys() {
@@ -141,6 +126,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         NSApp.mainMenu = mainMenu
     }
+}
+
+extension AppDelegate: PanelHost {
+    func setAlwaysOnTop(_ enabled: Bool) {
+        panel?.level = enabled ? .floating : .normal
+    }
+    func requestSettings() {
+        auxiliaryPanels?.toggleSettings()
+    }
+    func setCandidatesVisible(_ visible: Bool) {
+        auxiliaryPanels?.setCandidatesVisible(visible)
+    }
+    func setImportConfirmationVisible(_ visible: Bool) {
+        auxiliaryPanels?.setImportPromptVisible(visible)
+    }
+    // requestHide is provided by hidePanelAndFocusPrevious below; this satisfies the protocol.
+}
+
+extension AppDelegate {
+    func requestHide() { hidePanelAndFocusPrevious() }
 }
 
 extension AppDelegate: NSWindowDelegate {
