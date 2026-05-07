@@ -2,21 +2,21 @@
   "_comment": "Ratcheted baseline \u2014 see .claude/skills/apply-quality-gates/SKILL.md. Lower numbers via `bin/quality-bump`. Any PR that grows a count fails `bin/quality`.",
   "_captured_at": "2026-05-06",
   "swiftlint": {
-    "cyclomatic_complexity": 4,
-    "function_body_length": 26,
+    "cyclomatic_complexity": 3,
+    "function_body_length": 19,
     "type_body_length": 7,
-    "file_length": 5,
+    "file_length": 4,
     "function_parameter_count": 0,
     "force_unwrapping": 0,
     "force_cast": 0,
     "force_try": 0,
-    "total_warnings": 50
+    "total_warnings": 41
   },
   "periphery": {
     "unused_declarations": 4
   },
   "coverage": {
-    "line_coverage_percent_min": 3.04
+    "line_coverage_percent_min": 7.43
   },
   "_skipped": {
     "branch_coverage": "Apple platforms expose only line coverage natively",

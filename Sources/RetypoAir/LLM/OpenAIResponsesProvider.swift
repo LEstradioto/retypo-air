@@ -6,47 +6,49 @@ final class OpenAIResponsesProvider: LLMProviderClient {
     private let modelProvider = OpenAICompatibleProvider(kind: .openai, baseURL: URL(staticString: "https://api.openai.com/v1"))
 
     func complete(_ request: LLMRequest, apiKey: String) async throws -> LLMResponse {
-        let url = baseURL.appendingPathComponent("responses")
-        var urlRequest = URLRequest(url: url)
-        urlRequest.httpMethod = "POST"
-        urlRequest.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-        urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
-
-        let payload: [String: Any] = [
-            "model": request.model,
-            "instructions": request.system,
-            "input": request.user,
-            "max_output_tokens": request.maxTokens,
-            "temperature": request.temperature
-        ]
-        urlRequest.httpBody = try JSONSerialization.data(withJSONObject: payload)
-
+        let urlRequest = try makeResponsesRequest(request, apiKey: apiKey)
         let (data, response) = try await URLSession.shared.data(for: urlRequest)
         try validate(response: response, data: data)
         let object = try JSONSerialization.jsonObject(with: data) as? [String: Any]
-        if let text = object?["output_text"] as? String { return LLMResponse(text: text, usage: parseUsage(object?["usage"] as? [String: Any])) }
-        if let output = object?["output"] as? [[String: Any]] {
-            let text = output.flatMap { item -> [String] in
-                let content = item["content"] as? [[String: Any]] ?? []
-                return content.compactMap { $0["text"] as? String }
-            }.joined(separator: "")
-            if !text.isEmpty { return LLMResponse(text: text, usage: parseUsage(object?["usage"] as? [String: Any])) }
+        guard let text = extractText(from: object), !text.isEmpty else {
+            throw LLMError.invalidResponse
         }
-        throw LLMError.invalidResponse
+        return LLMResponse(text: text, usage: parseUsage(object?["usage"] as? [String: Any]))
     }
 
     func listModels(apiKey: String) async throws -> [ProviderModel] {
         try await modelProvider.listModels(apiKey: apiKey)
     }
 
+    private func makeResponsesRequest(_ request: LLMRequest, apiKey: String) throws -> URLRequest {
+        var urlRequest = URLRequest(url: baseURL.appendingPathComponent("responses"))
+        urlRequest.httpMethod = "POST"
+        urlRequest.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        urlRequest.httpBody = try JSONSerialization.data(withJSONObject: [
+            "model": request.model,
+            "instructions": request.system,
+            "input": request.user,
+            "max_output_tokens": request.maxTokens,
+            "temperature": request.temperature
+        ])
+        return urlRequest
+    }
+
+    private func extractText(from object: [String: Any]?) -> String? {
+        if let direct = object?["output_text"] as? String, !direct.isEmpty { return direct }
+        guard let output = object?["output"] as? [[String: Any]] else { return nil }
+        let text = output.flatMap { item -> [String] in
+            let content = item["content"] as? [[String: Any]] ?? []
+            return content.compactMap { $0["text"] as? String }
+        }.joined(separator: "")
+        return text.isEmpty ? nil : text
+    }
+
     private func parseUsage(_ usage: [String: Any]?) -> TokenUsage {
         guard let usage else { return .zero }
-        let input = usage["input_tokens"] as? Int
-            ?? usage["prompt_tokens"] as? Int
-            ?? 0
-        let output = usage["output_tokens"] as? Int
-            ?? usage["completion_tokens"] as? Int
-            ?? 0
+        let input = usage["input_tokens"] as? Int ?? usage["prompt_tokens"] as? Int ?? 0
+        let output = usage["output_tokens"] as? Int ?? usage["completion_tokens"] as? Int ?? 0
         return TokenUsage(inputTokens: input, outputTokens: output)
     }
 

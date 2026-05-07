@@ -57,40 +57,43 @@ struct SettingsFocusStyle: ViewModifier {
     var keyboardFocusable: Bool = false
     var activate: (() -> Bool)?
 
+    private var isVisuallyFocused: Bool {
+        coordinator.focusedID == id || isNativeFocused
+    }
+
     func body(content: Content) -> some View {
-        let isVisuallyFocused = coordinator.focusedID == id || isNativeFocused
         let view = content
             .id(id)
             .focused($isNativeFocused)
-            .onAppear {
-                isNativeFocused = coordinator.focusedID == id
-                if let activate {
-                    coordinator.registerAction(id, action: activate)
-                }
-            }
-            .onDisappear {
-                coordinator.unregisterAction(id)
-            }
-            .onChange(of: coordinator.focusedID) { nextID in
-                isNativeFocused = nextID == id
-                if nextID == id, let activate {
-                    coordinator.registerAction(id, action: activate)
-                }
-            }
-            .onChange(of: isNativeFocused) { focused in
-                if focused, coordinator.focusedID != id {
-                    coordinator.focusedID = id
-                }
-            }
-            .overlay(
-                RoundedRectangle(cornerRadius: radius, style: .continuous)
-                    .strokeBorder(isVisuallyFocused ? Color.accentColor.opacity(0.86) : Color.clear, lineWidth: 1.6)
-            )
+            .onAppear(perform: handleAppear)
+            .onDisappear { coordinator.unregisterAction(id) }
+            .onChange(of: coordinator.focusedID, perform: handleFocusedIDChange)
+            .onChange(of: isNativeFocused, perform: handleNativeFocusChange)
+            .overlay(focusOverlay)
 
-        if keyboardFocusable {
-            view.focusable(true)
-        } else {
-            view
+        if keyboardFocusable { view.focusable(true) } else { view }
+    }
+
+    private var focusOverlay: some View {
+        RoundedRectangle(cornerRadius: radius, style: .continuous)
+            .strokeBorder(isVisuallyFocused ? Color.accentColor.opacity(0.86) : Color.clear, lineWidth: 1.6)
+    }
+
+    private func handleAppear() {
+        isNativeFocused = coordinator.focusedID == id
+        if let activate { coordinator.registerAction(id, action: activate) }
+    }
+
+    private func handleFocusedIDChange(_ nextID: String?) {
+        isNativeFocused = nextID == id
+        if nextID == id, let activate {
+            coordinator.registerAction(id, action: activate)
+        }
+    }
+
+    private func handleNativeFocusChange(_ focused: Bool) {
+        if focused, coordinator.focusedID != id {
+            coordinator.focusedID = id
         }
     }
 }

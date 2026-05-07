@@ -54,10 +54,7 @@ extension AppState {
     }
 
     func onInputChanged() {
-        if !suppressNextInputChange, editor.canRedo {
-            editor.dropRedo()
-            publishUndoRedoAvailability()
-        }
+        commitNonRedoEdit()
         if typingStartedAt == nil { typingStartedAt = Date() }
         updateTypingStats()
         DraftStore.save(inputText)
@@ -67,6 +64,17 @@ extension AppState {
             suppressNextInputChange = false
             return
         }
+        scheduleAutoCorrectIfEligible()
+    }
+
+    private func commitNonRedoEdit() {
+        if !suppressNextInputChange, editor.canRedo {
+            editor.dropRedo()
+            publishUndoRedoAvailability()
+        }
+    }
+
+    private func scheduleAutoCorrectIfEligible() {
         guard settings.autoCorrect else { return }
         guard CorrectionPolicy.shouldAutoCorrect(inputText) else { return }
         let hash = inputText.hashValue

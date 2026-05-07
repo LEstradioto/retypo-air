@@ -55,29 +55,32 @@ extension AppDelegate {
     }
 
     private func startClipboardPoll(sourceApplication: NSRunningApplication, sourceName: String, trustedForAccessibility: Bool) {
-        let originalClipboard = ClipboardService.snapshot()
-        let pasteboard = NSPasteboard.general
-        let emptyMarker = "__RETYP_AIR_IMPORT_EMPTY_\(UUID().uuidString)__"
-        pasteboard.clearContents()
-        pasteboard.setString(emptyMarker, forType: .string)
-        let markerChangeCount = pasteboard.changeCount
-
+        let snapshot = ClipboardService.snapshot()
+        let marker = primeClipboardMarker()
         if trustedForAccessibility, pressCopyMenuItem(in: sourceApplication) {
             DebugLog.log("copy menu pressed via AX")
             completeSelectionImportWhenClipboardChanges(ImportPollContext(
-                originalClipboard: originalClipboard,
-                marker: emptyMarker,
-                markerChangeCount: markerChangeCount,
+                originalClipboard: snapshot,
+                marker: marker.text,
+                markerChangeCount: marker.changeCount,
                 sourceName: sourceName,
                 trustedForAccessibility: trustedForAccessibility,
                 deadline: Date().addingTimeInterval(0.9)
             ))
         } else {
             DebugLog.log("copy menu unavailable; not sending synthetic cmd+c to avoid leaking literal c")
-            ClipboardService.restore(originalClipboard)
+            ClipboardService.restore(snapshot)
             showPanel()
             state?.status = trustedForAccessibility ? "No selected text imported" : "Grant Accessibility permission to import selection"
         }
+    }
+
+    private func primeClipboardMarker() -> (text: String, changeCount: Int) {
+        let pasteboard = NSPasteboard.general
+        let marker = "__RETYP_AIR_IMPORT_EMPTY_\(UUID().uuidString)__"
+        pasteboard.clearContents()
+        pasteboard.setString(marker, forType: .string)
+        return (marker, pasteboard.changeCount)
     }
 
     func rememberPreviousApplication() {
@@ -93,27 +96,32 @@ extension AppDelegate {
         let isMarker = imported.hasPrefix("__RETYP_AIR_IMPORT_EMPTY_")
         let changed = pasteboard.changeCount != ctx.markerChangeCount || !isMarker
         DebugLog.log("clipboard poll changed=\(changed) changeCount=\(pasteboard.changeCount) markerChangeCount=\(ctx.markerChangeCount) importedLen=\(imported.count)")
-
         if !changed, Date() < ctx.deadline {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
-                self?.completeSelectionImportWhenClipboardChanges(ctx)
-            }
+            scheduleClipboardPoll(ctx)
             return
         }
-
         ClipboardService.restore(ctx.originalClipboard)
         let text = imported.trimmingCharacters(in: .newlines)
         guard changed, !text.isEmpty, !isMarker else {
-            DebugLog.log("import failed: clipboard did not contain selected text")
-            showPanel()
-            let permissionHint = ctx.trustedForAccessibility ? "" : " Grant Accessibility permission to Retypo Air, then try again."
-            state?.status = "No selected text imported.\(permissionHint)"
+            failImport(ctx: ctx)
             return
         }
-
         DebugLog.log("import success via clipboard length=\(imported.count)")
         let needsConfirmation = state?.receiveExternalImport(imported, source: ctx.sourceName) ?? false
         showPanel()
         if needsConfirmation { auxiliaryPanels?.setImportPromptVisible(true) }
+    }
+
+    private func scheduleClipboardPoll(_ ctx: ImportPollContext) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
+            self?.completeSelectionImportWhenClipboardChanges(ctx)
+        }
+    }
+
+    private func failImport(ctx: ImportPollContext) {
+        DebugLog.log("import failed: clipboard did not contain selected text")
+        showPanel()
+        let hint = ctx.trustedForAccessibility ? "" : " Grant Accessibility permission to Retypo Air, then try again."
+        state?.status = "No selected text imported.\(hint)"
     }
 }
