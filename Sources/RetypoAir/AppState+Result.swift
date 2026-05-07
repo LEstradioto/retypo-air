@@ -8,23 +8,13 @@ extension AppState {
         outputText = text
         diffText = DiffService.compactDiff(original: outcome.original, corrected: text)
         wordsChangedLast = InlineDiffService.changedWordCount(original: outcome.original, corrected: text)
-        let cost = applyCost(usage: outcome.response.usage)
-        appendHistory(HistoryDraft(original: outcome.original, output: text, diff: diffText, action: outcome.action, usage: outcome.response.usage, costUSD: cost))
-        appendUsage(model: selectedModel ?? "", usage: outcome.response.usage, costUSD: cost)
+        let costUSD = cost.recordUsage(provider: settings.provider, model: selectedModel ?? "", usage: outcome.response.usage)
+        appendHistory(HistoryDraft(original: outcome.original, output: text, diff: diffText, action: outcome.action, usage: outcome.response.usage, costUSD: costUSD))
+        cost.appendLedgerEntry(provider: settings.provider, model: selectedModel ?? "", usage: outcome.response.usage, costUSD: costUSD)
         if settings.editorLayout == .inline {
             applyInlineSubstitution(original: outcome.original, text: text)
         }
         finalizeOutcomeStatus(outcome, text: text)
-    }
-
-    private func applyCost(usage: TokenUsage) -> Double? {
-        let cost = computeCost(provider: settings.provider, model: selectedModel ?? "", usage: usage)
-        lastCost = CostSnapshot(usage: usage, costUSD: cost)
-        if let cost {
-            sessionCostUSD += cost
-            dayCostUSD += cost
-        }
-        return cost
     }
 
     private func applyInlineSubstitution(original: String, text: String) {
@@ -44,11 +34,11 @@ extension AppState {
     }
 
     func appendCandidate(output: String, original: String, response: LLMResponse, action: EditAction) {
-        let cost = computeCost(provider: settings.provider, model: selectedModel ?? "", usage: response.usage)
+        let costUSD = cost.computeCost(provider: settings.provider, model: selectedModel ?? "", usage: response.usage)
         let diff = DiffService.compactDiff(original: original, corrected: output)
-        candidateResults.append(CandidateResult(action: action, output: output, diff: diff, usage: response.usage, costUSD: cost))
-        appendHistory(HistoryDraft(original: original, output: output, diff: diff, action: action, usage: response.usage, costUSD: cost))
-        appendUsage(model: selectedModel ?? "", usage: response.usage, costUSD: cost)
+        candidateResults.append(CandidateResult(action: action, output: output, diff: diff, usage: response.usage, costUSD: costUSD))
+        appendHistory(HistoryDraft(original: original, output: output, diff: diff, action: action, usage: response.usage, costUSD: costUSD))
+        cost.appendLedgerEntry(provider: settings.provider, model: selectedModel ?? "", usage: response.usage, costUSD: costUSD)
     }
 
     func appendHistory(_ draft: HistoryDraft) {
@@ -67,36 +57,6 @@ extension AppState {
         history.insert(entry, at: 0)
         history = Array(history.prefix(max(1, settings.historyLimit)))
         HistoryStore.save(history, limit: settings.historyLimit)
-    }
-
-    func appendUsage(model: String, usage: TokenUsage, costUSD: Double?) {
-        let entry = UsageLedgerEntry(provider: settings.provider, model: model, usage: usage, costUSD: costUSD)
-        usageLedger.insert(entry, at: 0)
-        usageLedger = Array(usageLedger.prefix(500))
-        UsageLedgerStore.save(usageLedger)
-    }
-
-    func computeCost(provider: ProviderKind, model: String, usage: TokenUsage) -> Double? {
-        let key = PricingStore.key(provider: provider, model: model)
-        guard let pricing = pricing[key] else { return nil }
-        let inputCost = Double(usage.inputTokens) / 1_000_000 * pricing.inputPerMillion
-        let outputCost = Double(usage.outputTokens) / 1_000_000 * pricing.outputPerMillion
-        return inputCost + outputCost
-    }
-
-    func formatCost(_ value: Double?) -> String {
-        guard let value else { return "$—" }
-        if value == 0 { return "$0.0000" }
-        if value < 0.0001 { return String(format: "$%.6f", value) }
-        return String(format: "$%.4f", value)
-    }
-
-    static func costToday(from entries: [UsageLedgerEntry]) -> Double {
-        let calendar = Calendar.current
-        return entries.reduce(0) { total, entry in
-            guard calendar.isDateInToday(entry.timestamp), let cost = entry.costUSD else { return total }
-            return total + cost
-        }
     }
 
     func parseCorrection(_ text: String) -> (corrected: String, changed: Bool, confidence: Double)? {

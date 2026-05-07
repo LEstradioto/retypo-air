@@ -5,18 +5,18 @@
     "cyclomatic_complexity": 3,
     "function_body_length": 19,
     "type_body_length": 7,
-    "file_length": 4,
+    "file_length": 5,
     "function_parameter_count": 0,
     "force_unwrapping": 0,
     "force_cast": 0,
     "force_try": 0,
-    "total_warnings": 41
+    "total_warnings": 42
   },
   "periphery": {
     "unused_declarations": 4
   },
   "coverage": {
-    "line_coverage_percent_min": 7.43
+    "line_coverage_percent_min": 7.64
   },
   "_skipped": {
     "branch_coverage": "Apple platforms expose only line coverage natively",

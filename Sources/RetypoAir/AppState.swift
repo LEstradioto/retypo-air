@@ -1,4 +1,5 @@
 import Foundation
+import Combine
 import AppKit
 
 @MainActor
@@ -19,11 +20,6 @@ final class AppState: ObservableObject {
     @Published var selectedLauncherModeIndex = 0
     @Published var actions: [EditAction]
     @Published var history: [HistoryEntry]
-    @Published var usageLedger: [UsageLedgerEntry]
-    @Published var pricing: [String: ModelPricing]
-    @Published var lastCost: CostSnapshot = CostSnapshot(usage: .zero, costUSD: nil)
-    @Published var sessionCostUSD: Double = 0
-    @Published var dayCostUSD: Double = 0
     @Published var draftSnapshots: [DraftSnapshot]
     @Published var candidateResults: [CandidateResult] = []
     @Published var showCandidateOverlay = false
@@ -35,6 +31,7 @@ final class AppState: ObservableObject {
     @Published var canUndoEditorChange = false
     @Published var canRedoEditorChange = false
 
+    let cost: CostTracker
 
     weak var host: PanelHost?
 
@@ -46,24 +43,41 @@ final class AppState: ObservableObject {
     var suppressNextInputChange = false
     var typingStartedAt: Date?
     var editor = EditorEngine(limit: 50)
+    private var cancellables = Set<AnyCancellable>()
 
     init(settings: RetypoSettings) {
         self.settings = settings
         self.actions = EditActionStore.load()
         self.history = HistoryStore.load()
-        self.usageLedger = UsageLedgerStore.load()
-        var loadedPricing = PricingStore.load()
-        var pricingChanged = false
-        for (key, value) in DefaultPricing.exact where loadedPricing[key] != value {
-            loadedPricing[key] = value
-            pricingChanged = true
-        }
-        self.pricing = loadedPricing
+        let (loadedPricing, pricingChanged) = Self.loadedPricing()
+        self.cost = CostTracker(initialPricing: loadedPricing, initialUsageLedger: UsageLedgerStore.load())
         self.draftSnapshots = DraftSnapshotStore.load()
         self.inputText = DraftStore.load()
-        self.dayCostUSD = Self.costToday(from: self.usageLedger)
         if pricingChanged { PricingStore.save(loadedPricing) }
+        rebroadcastCostChanges()
     }
+
+    private static func loadedPricing() -> (pricing: [String: ModelPricing], changed: Bool) {
+        var loaded = PricingStore.load()
+        var changed = false
+        for (key, value) in DefaultPricing.exact where loaded[key] != value {
+            loaded[key] = value
+            changed = true
+        }
+        return (loaded, changed)
+    }
+
+    private func rebroadcastCostChanges() {
+        cost.objectWillChange.sink { [weak self] _ in
+            self?.objectWillChange.send()
+        }.store(in: &cancellables)
+    }
+
+    // Forwarding to CostTracker so views observing AppState don't need to change.
+    var lastCost: CostSnapshot { cost.lastCost }
+    var lastCostLabel: String { cost.lastCostLabel }
+    var sessionCostLabel: String { cost.sessionCostLabel }
+    var dayCostLabel: String { cost.dayCostLabel }
 
     var selectedProvider: ProviderKind {
         get { settings.provider }
@@ -102,9 +116,6 @@ final class AppState: ObservableObject {
         "Mode: \(currentAction.title) · Model: \(modelLabel) · \(settings.editorLayout.displayName)"
     }
 
-    var lastCostLabel: String { formatCost(lastCost.costUSD) }
-    var sessionCostLabel: String { formatCost(sessionCostUSD) }
-    var dayCostLabel: String { formatCost(dayCostUSD) }
 
     func setSelectedModel(_ model: String, provider: ProviderKind? = nil) {
         if let provider { settings.provider = provider }

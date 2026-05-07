@@ -10,33 +10,17 @@ extension AppState {
         EditActionStore.save(actions)
     }
 
-    func savePricing() {
-        PricingStore.save(pricing)
-    }
-
+    // Pricing forwarding (CostTracker owns the data; views observe AppState).
     func mergePricingDefaults(for provider: ProviderKind, models: [ProviderModel]) {
-        var changed = false
-        for model in models {
-            let key = PricingStore.key(provider: provider, model: model.id)
-            if let value = model.pricing ?? DefaultPricing.pricing(provider: provider, modelID: model.id), pricing[key] != value {
-                pricing[key] = value
-                changed = true
-            }
-        }
-        for (key, value) in DefaultPricing.exact where pricing[key] != value {
-            pricing[key] = value
-            changed = true
-        }
-        if changed { savePricing() }
+        cost.mergePricingDefaults(for: provider, models: models)
     }
 
     func pricingBindingValue(for provider: ProviderKind, model: String) -> ModelPricing {
-        pricing[PricingStore.key(provider: provider, model: model)] ?? .zero
+        cost.pricingBindingValue(for: provider, model: model)
     }
 
     func setPricing(_ value: ModelPricing, provider: ProviderKind, model: String) {
-        pricing[PricingStore.key(provider: provider, model: model)] = value
-        savePricing()
+        cost.setPricing(value, provider: provider, model: model)
     }
 
     func updatePanelFrame(_ frame: NSRect) {
