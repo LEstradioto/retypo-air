@@ -19,10 +19,9 @@ struct SettingsView: View {
                     ScrollView {
                         VStack(spacing: 14) {
                             modelSection
-                            modeSection
                             editorSection
-                            shortcutSection
-                            pricingSection
+                            accessSection
+                            modeSection
                             historySection
                         }
                         .padding(18)
@@ -51,9 +50,25 @@ struct SettingsView: View {
             "model.provider",
             "model.model",
             "model.refresh",
-            "modes.add"
+            "editor.layout",
+            "editor.theme",
+            "editor.autoRun",
+            "editor.autoCopy",
+            "editor.hideAfterCopy",
+            "editor.alwaysOnTop",
+            "editor.followScreen",
+            "editor.nativeSpellcheck",
+            "editor.debounce",
+            "shortcuts.previousModel",
+            "shortcuts.nextModel"
         ]
-
+        for model in (state.llm.modelsByProvider[state.selectedProvider] ?? []).prefix(24) {
+            ids.append(modelFocusID(model.id, "accepted"))
+            ids.append(modelFocusID(model.id, "shortcut"))
+            ids.append(modelFocusID(model.id, "pricing.input"))
+            ids.append(modelFocusID(model.id, "pricing.output"))
+        }
+        ids.append("modes.add")
         for action in state.actions {
             ids.append(modeFocusID(action.id, "enabled"))
             ids.append(modeFocusID(action.id, "select"))
@@ -67,31 +82,6 @@ struct SettingsView: View {
                 ids.append(modeFocusID(action.id, "delete"))
             }
         }
-
-        ids.append(contentsOf: [
-            "editor.layout",
-            "editor.theme",
-            "editor.autoRun",
-            "editor.autoCopy",
-            "editor.hideAfterCopy",
-            "editor.alwaysOnTop",
-            "editor.followScreen",
-            "editor.nativeSpellcheck",
-            "editor.debounce",
-            "shortcuts.previousModel",
-            "shortcuts.nextModel"
-        ])
-
-        for model in (state.llm.modelsByProvider[state.selectedProvider] ?? []).prefix(24) {
-            ids.append(modelFocusID(model.id, "accepted"))
-            ids.append(modelFocusID(model.id, "shortcut"))
-        }
-
-        for model in (state.llm.modelsByProvider[state.selectedProvider] ?? []).prefix(12) {
-            ids.append(modelFocusID(model.id, "pricing.input"))
-            ids.append(modelFocusID(model.id, "pricing.output"))
-        }
-
         ids.append("history.limit")
         ids.append("history.display")
         ids.append(contentsOf: state.history.map { historyFocusID($0.id) })

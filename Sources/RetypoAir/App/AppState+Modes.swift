@@ -9,7 +9,7 @@ extension AppState {
     }
 
     func deleteMode(_ action: EditAction) {
-        guard actions.count > 1 else { return }
+        guard actions.count > 1, action.id != EditAction.freeformID else { return }
         actions.removeAll { $0.id == action.id }
         if settings.currentActionID == action.id { settings.currentActionID = enabledActions.first?.id ?? actions.first?.id ?? "correct" }
         saveModes()

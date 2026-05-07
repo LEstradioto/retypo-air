@@ -27,6 +27,9 @@ final class AppState: ObservableObject {
     @Published var pendingImport: PendingImport?
     @Published var canUndoEditorChange = false
     @Published var canRedoEditorChange = false
+    /// Live instruction text for the Freeform mode. Populated only while
+    /// the user has Freeform selected; sent as the system instruction at run.
+    @Published var freeformInstruction: String = ""
 
     let cost: CostTracker
     let llm = LLMSession()

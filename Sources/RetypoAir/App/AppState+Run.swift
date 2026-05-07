@@ -41,9 +41,13 @@ extension AppState {
             await correctAndMaybeCopy(source: source)
             return
         }
+        guard let instruction = resolvedInstruction(for: action) else {
+            status = "Type a Freeform instruction first"
+            return
+        }
         guard let context = startEditAction(action, source: source) else { return }
         do {
-            let response = try await llm.router.complete(editRequest(action: action, model: context.model, original: context.original))
+            let response = try await llm.router.complete(editRequest(instruction: instruction, model: context.model, original: context.original))
             guard context.generation == llm.generation else { return }
             let text = response.text.trimmingCharacters(in: .whitespacesAndNewlines)
             applyResult(ActionOutcome(text: text, original: context.original, changed: text != context.original, response: response, action: action))
@@ -52,6 +56,16 @@ extension AppState {
             status = error.localizedDescription
         }
         llm.isCorrecting = false
+    }
+
+    /// Resolve the system instruction for an action, returning nil when the
+    /// Freeform mode has no user-typed instruction yet.
+    func resolvedInstruction(for action: EditAction) -> String? {
+        if action.id == EditAction.freeformID {
+            let trimmed = freeformInstruction.trimmingCharacters(in: .whitespacesAndNewlines)
+            return trimmed.isEmpty ? nil : trimmed
+        }
+        return action.instruction
     }
 
     func runAllEnabledModes() async {
@@ -77,7 +91,8 @@ extension AppState {
                 let parsed = parseCorrection(response.text) ?? (response.text.trimmingCharacters(in: .whitespacesAndNewlines), true, 0.5)
                 appendCandidate(output: parsed.corrected, original: original, response: response, action: action)
             } else {
-                let response = try await llm.router.complete(editRequest(action: action, model: model, original: original))
+                guard let instruction = resolvedInstruction(for: action) else { return }
+                let response = try await llm.router.complete(editRequest(instruction: instruction, model: model, original: original))
                 appendCandidate(output: response.text.trimmingCharacters(in: .whitespacesAndNewlines), original: original, response: response, action: action)
             }
         } catch {
@@ -131,11 +146,11 @@ extension AppState {
         )
     }
 
-    private func editRequest(action: EditAction, model: String, original: String) -> LLMRequest {
+    private func editRequest(instruction: String, model: String, original: String) -> LLMRequest {
         LLMRequest(
             provider: settings.provider,
             model: model,
-            system: PromptTemplates.actionSystem(instruction: action.instruction),
+            system: PromptTemplates.actionSystem(instruction: instruction),
             user: original,
             maxTokens: max(800, min(5_000, original.count * 2)),
             temperature: 0.2

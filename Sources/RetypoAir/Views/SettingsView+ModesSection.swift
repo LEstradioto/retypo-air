@@ -82,7 +82,7 @@ extension SettingsView {
                 state.deleteMode(action)
                 return true
             })
-            .disabled(state.actions.count <= 1)
+            .disabled(state.actions.count <= 1 || action.id == EditAction.freeformID)
     }
 
     private func toggleModeEditor(_ actionID: String) {

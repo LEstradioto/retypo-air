@@ -27,14 +27,18 @@ extension AuxiliaryPanelController {
     private func makeCandidatesPanel(state: AppState) -> KeyableAuxiliaryPanel {
         let panel = makePanel(width: 900, height: 230, minWidth: 240, minHeight: 140)
         panel.contentView = roundedHostingView(rootView: CandidateOverlayWindowView().environmentObject(state), radius: 18)
-        panel.onTabKey = { [weak state] in
+        let nextItem: () -> Void = { [weak state] in
             guard let state else { return }
             state.candidateResults.isEmpty ? state.nextLauncherMode() : state.nextCandidate()
         }
-        panel.onShiftTabKey = { [weak state] in
+        let previousItem: () -> Void = { [weak state] in
             guard let state else { return }
             state.candidateResults.isEmpty ? state.previousLauncherMode() : state.previousCandidate()
         }
+        panel.onTabKey = nextItem
+        panel.onRightKey = nextItem
+        panel.onShiftTabKey = previousItem
+        panel.onLeftKey = previousItem
         panel.onEnterKey = { [weak state] in
             candidateEnterAction(for: state)
         }

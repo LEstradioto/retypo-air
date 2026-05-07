@@ -24,6 +24,16 @@ final class AuxiliaryPanelController {
         }
     }
 
+    /// Order out every auxiliary panel without focusing the main editor.
+    /// Called when the global hide hotkey is fired.
+    func hideAll() {
+        settingsPanel?.orderOut(nil)
+        state?.showSettings = false
+        candidatesPanel?.orderOut(nil)
+        state?.showCandidateOverlay = false
+        importPromptPanel?.orderOut(nil)
+    }
+
     func makePanel(width: CGFloat, height: CGFloat, minWidth: CGFloat, minHeight: CGFloat) -> KeyableAuxiliaryPanel {
         let panel = KeyableAuxiliaryPanel(
             contentRect: NSRect(x: 0, y: 0, width: width, height: height),

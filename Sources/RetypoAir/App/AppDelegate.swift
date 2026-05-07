@@ -71,6 +71,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func hidePanelAndFocusPrevious() {
         panel?.orderOut(nil)
+        auxiliaryPanels?.hideAll()
         if let previousApplication, !previousApplication.isTerminated {
             previousApplication.activate(options: [.activateIgnoringOtherApps])
         }

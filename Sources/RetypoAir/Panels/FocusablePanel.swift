@@ -3,6 +3,8 @@ import AppKit
 final class KeyableAuxiliaryPanel: NSPanel {
     var onTabKey: (() -> Void)?
     var onShiftTabKey: (() -> Void)?
+    var onLeftKey: (() -> Void)?
+    var onRightKey: (() -> Void)?
     var onEnterKey: (() -> Bool)?
     var onCloseKey: (() -> Void)?
     var onCommandSKey: (() -> Void)?
@@ -29,6 +31,8 @@ final class KeyableAuxiliaryPanel: NSPanel {
         let mods = event.modifierFlags
         switch Int(event.keyCode) {
         case 48: return invokeTabHandler(shift: mods.contains(.shift))                          // tab
+        case 123: return invoke(onLeftKey)                                                       // left arrow
+        case 124: return invoke(onRightKey)                                                      // right arrow
         case 13 where mods.contains(.control): return invoke(onCloseKey)                         // ctrl+w
         case 1 where mods.contains(.command): return invoke(onCommandSKey)                       // cmd+s
         case 2 where mods.contains(.command) || mods.contains(.control):

@@ -1,51 +1,6 @@
 import SwiftUI
 
 extension SettingsView {
-    var pricingSection: some View {
-        SettingsCard(title: "Cost tracking") {
-            Text("Token usage is read from provider responses. Costs require per-model prices in USD per 1M input/output tokens, saved to ~/.retypo-air/pricing.json.")
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(.secondary)
-            HStack(spacing: 14) {
-                Text("Last \(state.cost.lastCostLabel)")
-                Text("Session \(state.cost.sessionCostLabel)")
-                Text("Today \(state.cost.dayCostLabel)")
-                Text("Tokens \(state.cost.lastCost.usage.totalTokens)")
-            }
-            .font(.system(size: 12, weight: .semibold, design: .monospaced))
-            let models = state.llm.modelsByProvider[state.selectedProvider] ?? []
-            if models.isEmpty {
-                Text("Refresh models to edit pricing for this provider.")
-                    .foregroundStyle(.secondary)
-            } else {
-                VStack(spacing: 8) {
-                    ForEach(models.prefix(12)) { model in
-                        pricingRow(modelID: model.id)
-                    }
-                }
-            }
-        }
-    }
-
-    private func pricingRow(modelID: String) -> some View {
-        HStack(spacing: 10) {
-            Text(modelID)
-                .font(.system(size: 12, weight: .medium, design: .monospaced))
-                .lineLimit(1)
-            Spacer()
-            Text("in").foregroundStyle(.secondary)
-            TextField("0.00", value: pricingInputBinding(modelID), format: .number)
-                .textFieldStyle(.roundedBorder)
-                .settingsFocus(modelFocusID(modelID, "pricing.input"), radius: 6)
-                .frame(width: 76)
-            Text("out").foregroundStyle(.secondary)
-            TextField("0.00", value: pricingOutputBinding(modelID), format: .number)
-                .textFieldStyle(.roundedBorder)
-                .settingsFocus(modelFocusID(modelID, "pricing.output"), radius: 6)
-                .frame(width: 76)
-        }
-    }
-
     var historySection: some View {
         SettingsCard(title: "History") {
             historySectionHeader

@@ -6,6 +6,11 @@ struct EditAction: Identifiable, Hashable, Codable {
     var instruction: String
     var isEnabled: Bool = true
 
+    /// The id of the always-present "freeform" mode, where the user types the
+    /// instruction in real time instead of saving it ahead of time. Cannot be
+    /// deleted or its id reused.
+    static let freeformID = "freeform"
+
     static let defaults: [EditAction] = [
         EditAction(id: "correct", title: "Correct", instruction: "Fix typos only. Preserve wording, tone, punctuation style, and language unless a typo requires a minimal correction."),
         EditAction(id: "typos-grammar", title: "Typos and Grammar", instruction: "Fix typos, grammar, punctuation, and awkward grammatical mistakes while preserving the original meaning, voice, and language."),
@@ -18,7 +23,8 @@ struct EditAction: Identifiable, Hashable, Codable {
         EditAction(id: "tweet-fit", title: "Make this Tweet Fit", instruction: "Rewrite the text to fit within 280 characters for X/Twitter. Preserve the core point and make it natural."),
         EditAction(id: "variations-3", title: "Generate 3 variations", instruction: "Generate three distinct polished variations of the text. Number them 1, 2, and 3."),
         EditAction(id: "respond-3-ways", title: "How to respond 3 ways", instruction: "Suggest three possible replies to the text: one concise, one friendly, and one direct. Number them 1, 2, and 3."),
-        EditAction(id: "caveman", title: "Caveman", instruction: "Rewrite the text in an intentionally simple caveman style. Keep the meaning, use short blunt words, and avoid complex grammar.")
+        EditAction(id: "caveman", title: "Caveman", instruction: "Rewrite the text in an intentionally simple caveman style. Keep the meaning, use short blunt words, and avoid complex grammar."),
+        EditAction(id: freeformID, title: "Freeform", instruction: "")
     ]
 }
 
