@@ -143,16 +143,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 }
 
-private extension NSView {
-    func firstSubview<T: NSView>(of type: T.Type) -> T? {
-        if let view = self as? T { return view }
-        for subview in subviews {
-            if let found = subview.firstSubview(of: type) { return found }
-        }
-        return nil
-    }
-}
-
 extension AppDelegate: NSWindowDelegate {
     func windowDidBecomeKey(_ notification: Notification) { focusEditorIfPossible() }
     func windowDidMove(_ notification: Notification) { persistFrame(); auxiliaryPanels?.repositionCandidatesIfVisible() }

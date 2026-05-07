@@ -3,154 +3,16 @@ import SwiftUI
 
 @MainActor
 final class AuxiliaryPanelController {
-    private weak var mainPanel: NSWindow?
-    private weak var state: AppState?
-    private let settingsFocus = SettingsFocusCoordinator()
-    private var settingsPanel: NSPanel?
-    private var candidatesPanel: NSPanel?
-    private var importPromptPanel: NSPanel?
+    weak var mainPanel: NSWindow?
+    weak var state: AppState?
+    let settingsFocus = SettingsFocusCoordinator()
+    var settingsPanel: NSPanel?
+    var candidatesPanel: NSPanel?
+    var importPromptPanel: NSPanel?
 
     init(mainPanel: NSWindow, state: AppState) {
         self.mainPanel = mainPanel
         self.state = state
-    }
-
-    func showSettings() {
-        guard let state else { return }
-        state.showSettings = true
-        if settingsPanel == nil {
-            let panel = makePanel(width: 780, height: 720, minWidth: 560, minHeight: 420)
-            panel.contentView = roundedHostingView(rootView: SettingsView().environmentObject(state).environmentObject(settingsFocus), radius: 24)
-            panel.onTabKey = { [weak self] in
-                self?.settingsFocus.advance(reverse: false)
-            }
-            panel.onShiftTabKey = { [weak self] in
-                self?.settingsFocus.advance(reverse: true)
-            }
-            panel.onEnterKey = { [weak self] in
-                self?.settingsFocus.activateFocused() ?? false
-            }
-            panel.onCloseKey = { [weak self] in
-                self?.hideSettings(focusMain: true)
-            }
-            panel.onCommandSKey = { [weak self] in
-                self?.hideSettings(focusMain: true)
-            }
-            settingsPanel = panel
-        }
-        guard let settingsPanel else { return }
-        positionSettings(settingsPanel)
-        NSApp.activate(ignoringOtherApps: true)
-        settingsPanel.makeKeyAndOrderFront(nil)
-        settingsPanel.orderFrontRegardless()
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) { [weak self, weak settingsPanel] in
-            guard let settingsPanel else { return }
-            settingsPanel.makeKeyAndOrderFront(nil)
-            settingsPanel.makeFirstResponder(settingsPanel.contentView)
-            self?.settingsFocus.focusFirst()
-        }
-    }
-
-    func hideSettings(focusMain: Bool = false) {
-        settingsPanel?.orderOut(nil)
-        state?.showSettings = false
-        if focusMain { focusMainEditor() }
-    }
-
-    func toggleSettings() {
-        if settingsPanel?.isVisible == true { hideSettings(focusMain: true) } else { showSettings() }
-    }
-
-    func showCandidates() {
-        guard let state else { return }
-        if candidatesPanel == nil {
-            let panel = makePanel(width: 900, height: 230, minWidth: 240, minHeight: 140)
-            panel.contentView = roundedHostingView(rootView: CandidateOverlayWindowView().environmentObject(state), radius: 18)
-            panel.onTabKey = { [weak state] in
-                guard let state else { return }
-                state.candidateResults.isEmpty ? state.nextLauncherMode() : state.nextCandidate()
-            }
-            panel.onShiftTabKey = { [weak state] in
-                guard let state else { return }
-                state.candidateResults.isEmpty ? state.previousLauncherMode() : state.previousCandidate()
-            }
-            panel.onEnterKey = { [weak state] in
-                guard let state else { return false }
-                if state.candidateResults.isEmpty {
-                    Task { await state.runSelectedLauncherMode() }
-                } else {
-                    state.restoreSelectedCandidateToEditor()
-                }
-                return true
-            }
-            panel.onCloseKey = { [weak self, weak state] in
-                if let state, !state.candidateResults.isEmpty {
-                    state.clearCandidateResults()
-                } else {
-                    self?.hideCandidates(focusMain: true)
-                }
-            }
-            panel.onToggleCandidatesKey = { [weak self] in
-                self?.hideCandidates(focusMain: true)
-            }
-            candidatesPanel = panel
-        }
-        guard let candidatesPanel else { return }
-        positionCandidates(candidatesPanel)
-        NSApp.activate(ignoringOtherApps: true)
-        candidatesPanel.makeKeyAndOrderFront(nil)
-        candidatesPanel.orderFrontRegardless()
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak candidatesPanel] in
-            candidatesPanel?.makeKeyAndOrderFront(nil)
-            candidatesPanel?.makeFirstResponder(candidatesPanel?.contentView)
-        }
-    }
-
-    func hideCandidates(focusMain: Bool = false) {
-        candidatesPanel?.orderOut(nil)
-        state?.showCandidateOverlay = false
-        if focusMain { focusMainEditor() }
-    }
-
-    func setCandidatesVisible(_ visible: Bool) {
-        visible ? showCandidates() : hideCandidates(focusMain: true)
-    }
-
-    func showImportPrompt() {
-        guard let state else { return }
-        if importPromptPanel == nil {
-            let panel = makePanel(width: 460, height: 92, minWidth: 340, minHeight: 78)
-            panel.contentView = roundedHostingView(rootView: ImportConfirmWindowView().environmentObject(state), radius: 18)
-            panel.onEnterKey = { [weak state] in
-                state?.confirmPendingImport()
-                return true
-            }
-            panel.onCloseKey = { [weak state] in
-                state?.cancelPendingImport()
-            }
-            panel.onCommandSKey = { [weak state] in
-                state?.cancelPendingImport()
-            }
-            importPromptPanel = panel
-        }
-        guard let importPromptPanel else { return }
-        positionImportPrompt(importPromptPanel)
-        NSApp.activate(ignoringOtherApps: true)
-        importPromptPanel.makeKeyAndOrderFront(nil)
-        importPromptPanel.orderFrontRegardless()
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.04) { [weak importPromptPanel] in
-            importPromptPanel?.makeKeyAndOrderFront(nil)
-            importPromptPanel?.makeFirstResponder(importPromptPanel?.contentView)
-        }
-    }
-
-    func hideImportPrompt(focusMain: Bool) {
-        importPromptPanel?.orderOut(nil)
-        if focusMain { focusMainEditor() }
-    }
-
-    func setImportPromptVisible(_ visible: Bool) {
-        visible ? showImportPrompt() : hideImportPrompt(focusMain: true)
     }
 
     func repositionCandidatesIfVisible() {
@@ -162,7 +24,7 @@ final class AuxiliaryPanelController {
         }
     }
 
-    private func makePanel(width: CGFloat, height: CGFloat, minWidth: CGFloat, minHeight: CGFloat) -> KeyableAuxiliaryPanel {
+    func makePanel(width: CGFloat, height: CGFloat, minWidth: CGFloat, minHeight: CGFloat) -> KeyableAuxiliaryPanel {
         let panel = KeyableAuxiliaryPanel(
             contentRect: NSRect(x: 0, y: 0, width: width, height: height),
             styleMask: [.borderless, .resizable],
@@ -182,7 +44,7 @@ final class AuxiliaryPanelController {
         return panel
     }
 
-    private func focusMainEditor() {
+    func focusMainEditor() {
         guard let mainPanel else { return }
         NSApp.activate(ignoringOtherApps: true)
         mainPanel.makeKeyAndOrderFront(nil)
@@ -193,7 +55,7 @@ final class AuxiliaryPanelController {
         }
     }
 
-    private func roundedHostingView<Content: View>(rootView: Content, radius: CGFloat) -> NSHostingView<Content> {
+    func roundedHostingView<Content: View>(rootView: Content, radius: CGFloat) -> NSHostingView<Content> {
         let view = NSHostingView(rootView: rootView)
         view.wantsLayer = true
         view.layer?.cornerRadius = radius
@@ -201,7 +63,7 @@ final class AuxiliaryPanelController {
         return view
     }
 
-    private func positionSettings(_ panel: NSPanel) {
+    func positionSettings(_ panel: NSPanel) {
         guard let screen = mainPanel?.screen ?? NSScreen.main else { return }
         let visible = screen.visibleFrame
         let size = panel.frame.size
@@ -210,7 +72,7 @@ final class AuxiliaryPanelController {
         panel.setFrame(NSRect(origin: NSPoint(x: x, y: y), size: size), display: false)
     }
 
-    private func positionCandidates(_ panel: NSPanel) {
+    func positionCandidates(_ panel: NSPanel) {
         guard let mainPanel else { return }
         let screen = mainPanel.screen ?? NSScreen.main
         guard let screen else { return }
@@ -224,7 +86,7 @@ final class AuxiliaryPanelController {
         panel.setFrame(NSRect(x: x, y: y, width: width, height: height), display: false)
     }
 
-    private func positionImportPrompt(_ panel: NSPanel) {
+    func positionImportPrompt(_ panel: NSPanel) {
         guard let mainPanel else { return }
         let screen = mainPanel.screen ?? NSScreen.main
         guard let screen else { return }
@@ -238,8 +100,7 @@ final class AuxiliaryPanelController {
     }
 }
 
-
-private extension NSView {
+extension NSView {
     func firstSubview<T: NSView>(of type: T.Type) -> T? {
         if let view = self as? T { return view }
         for subview in subviews {

@@ -23,33 +23,14 @@ extension AppState {
     }
 
     func correctAndMaybeCopy(source: String = "manual") async {
-        guard let model = selectedModel else {
-            status = "Choose a model before correction"
-            return
-        }
-        let original = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !original.isEmpty else { return }
-        lastAutoSubmittedHash = inputText.hashValue
-        correctionGeneration += 1
-        let generation = correctionGeneration
-
-        isCorrecting = true
-        status = source == "auto" ? "Auto correcting" : "Correcting"
+        guard let context = startCorrection(source: source) else { return }
         do {
-            let request = LLMRequest(
-                provider: settings.provider,
-                model: model,
-                system: PromptTemplates.correctionSystem,
-                user: PromptTemplates.correctionUser(original),
-                maxTokens: max(512, min(4_000, original.count * 2)),
-                temperature: 0
-            )
-            let response = try await router.complete(request)
-            guard generation == correctionGeneration else { return }
+            let response = try await router.complete(correctionRequest(model: context.model, original: context.original))
+            guard context.generation == correctionGeneration else { return }
             let parsed = parseCorrection(response.text) ?? (response.text.trimmingCharacters(in: .whitespacesAndNewlines), true, 0.5)
-            applyResult(ActionOutcome(text: parsed.corrected, original: original, changed: parsed.changed, response: response, action: currentAction))
+            applyResult(ActionOutcome(text: parsed.corrected, original: context.original, changed: parsed.changed, response: response, action: currentAction))
         } catch {
-            guard generation == correctionGeneration else { return }
+            guard context.generation == correctionGeneration else { return }
             status = error.localizedDescription
         }
         isCorrecting = false
@@ -60,42 +41,21 @@ extension AppState {
             await correctAndMaybeCopy(source: source)
             return
         }
-        guard let model = selectedModel else {
-            status = "Choose a model before editing"
-            return
-        }
-        let original = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !original.isEmpty else { return }
-        lastAutoSubmittedHash = inputText.hashValue
-        correctionGeneration += 1
-        let generation = correctionGeneration
-        isCorrecting = true
-        status = source == "auto" ? "Auto \(action.title.lowercased())" : "Running \(action.title)"
+        guard let context = startEditAction(action, source: source) else { return }
         do {
-            let request = LLMRequest(
-                provider: settings.provider,
-                model: model,
-                system: PromptTemplates.actionSystem(instruction: action.instruction),
-                user: original,
-                maxTokens: max(800, min(5_000, original.count * 2)),
-                temperature: 0.2
-            )
-            let response = try await router.complete(request)
-            guard generation == correctionGeneration else { return }
+            let response = try await router.complete(editRequest(action: action, model: context.model, original: context.original))
+            guard context.generation == correctionGeneration else { return }
             let text = response.text.trimmingCharacters(in: .whitespacesAndNewlines)
-            applyResult(ActionOutcome(text: text, original: original, changed: text != original, response: response, action: action))
+            applyResult(ActionOutcome(text: text, original: context.original, changed: text != context.original, response: response, action: action))
         } catch {
-            guard generation == correctionGeneration else { return }
+            guard context.generation == correctionGeneration else { return }
             status = error.localizedDescription
         }
         isCorrecting = false
     }
 
     func runAllEnabledModes() async {
-        guard let model = selectedModel else {
-            status = "Choose a model before running all"
-            return
-        }
+        guard let model = selectedModel else { status = "Choose a model before running all"; return }
         let original = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !original.isEmpty else { return }
         isCorrecting = true
@@ -104,23 +64,81 @@ extension AppState {
         setCandidateOverlayVisible(true)
         selectedCandidateIndex = 0
         for action in enabledActions {
-            do {
-                let response: LLMResponse
-                if action.id == "correct" {
-                    let request = LLMRequest(provider: settings.provider, model: model, system: PromptTemplates.correctionSystem, user: PromptTemplates.correctionUser(original), maxTokens: max(512, min(4_000, original.count * 2)), temperature: 0)
-                    response = try await router.complete(request)
-                    let parsed = parseCorrection(response.text) ?? (response.text.trimmingCharacters(in: .whitespacesAndNewlines), true, 0.5)
-                    appendCandidate(output: parsed.corrected, original: original, response: response, action: action)
-                } else {
-                    let request = LLMRequest(provider: settings.provider, model: model, system: PromptTemplates.actionSystem(instruction: action.instruction), user: original, maxTokens: max(800, min(5_000, original.count * 2)), temperature: 0.2)
-                    response = try await router.complete(request)
-                    appendCandidate(output: response.text.trimmingCharacters(in: .whitespacesAndNewlines), original: original, response: response, action: action)
-                }
-            } catch {
-                status = error.localizedDescription
-            }
+            await runOneCandidate(action, model: model, original: original)
         }
         if !candidateResults.isEmpty { selectCandidate(at: 0) }
         isCorrecting = false
+    }
+
+    private func runOneCandidate(_ action: EditAction, model: String, original: String) async {
+        do {
+            if action.id == "correct" {
+                let response = try await router.complete(correctionRequest(model: model, original: original))
+                let parsed = parseCorrection(response.text) ?? (response.text.trimmingCharacters(in: .whitespacesAndNewlines), true, 0.5)
+                appendCandidate(output: parsed.corrected, original: original, response: response, action: action)
+            } else {
+                let response = try await router.complete(editRequest(action: action, model: model, original: original))
+                appendCandidate(output: response.text.trimmingCharacters(in: .whitespacesAndNewlines), original: original, response: response, action: action)
+            }
+        } catch {
+            status = error.localizedDescription
+        }
+    }
+
+    private struct ActionContext {
+        let model: String
+        let original: String
+        let generation: Int
+    }
+
+    private func startCorrection(source: String) -> ActionContext? {
+        guard let context = beginAction(statusAuto: "Auto correcting", statusManual: "Correcting", source: source) else {
+            if selectedModel == nil { status = "Choose a model before correction" }
+            return nil
+        }
+        return context
+    }
+
+    private func startEditAction(_ action: EditAction, source: String) -> ActionContext? {
+        let auto = "Auto \(action.title.lowercased())"
+        let manual = "Running \(action.title)"
+        guard let context = beginAction(statusAuto: auto, statusManual: manual, source: source) else {
+            if selectedModel == nil { status = "Choose a model before editing" }
+            return nil
+        }
+        return context
+    }
+
+    private func beginAction(statusAuto: String, statusManual: String, source: String) -> ActionContext? {
+        guard let model = selectedModel else { return nil }
+        let original = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !original.isEmpty else { return nil }
+        lastAutoSubmittedHash = inputText.hashValue
+        correctionGeneration += 1
+        isCorrecting = true
+        status = source == "auto" ? statusAuto : statusManual
+        return ActionContext(model: model, original: original, generation: correctionGeneration)
+    }
+
+    private func correctionRequest(model: String, original: String) -> LLMRequest {
+        LLMRequest(
+            provider: settings.provider,
+            model: model,
+            system: PromptTemplates.correctionSystem,
+            user: PromptTemplates.correctionUser(original),
+            maxTokens: max(512, min(4_000, original.count * 2)),
+            temperature: 0
+        )
+    }
+
+    private func editRequest(action: EditAction, model: String, original: String) -> LLMRequest {
+        LLMRequest(
+            provider: settings.provider,
+            model: model,
+            system: PromptTemplates.actionSystem(instruction: action.instruction),
+            user: original,
+            maxTokens: max(800, min(5_000, original.count * 2)),
+            temperature: 0.2
+        )
     }
 }

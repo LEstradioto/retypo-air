@@ -8,21 +8,34 @@ extension AppState {
         outputText = text
         diffText = DiffService.compactDiff(original: outcome.original, corrected: text)
         wordsChangedLast = InlineDiffService.changedWordCount(original: outcome.original, corrected: text)
-        let cost = computeCost(provider: settings.provider, model: selectedModel ?? "", usage: outcome.response.usage)
-        lastCost = CostSnapshot(usage: outcome.response.usage, costUSD: cost)
+        let cost = applyCost(usage: outcome.response.usage)
+        appendHistory(HistoryDraft(original: outcome.original, output: text, diff: diffText, action: outcome.action, usage: outcome.response.usage, costUSD: cost))
+        appendUsage(model: selectedModel ?? "", usage: outcome.response.usage, costUSD: cost)
+        if settings.editorLayout == .inline {
+            applyInlineSubstitution(original: outcome.original, text: text)
+        }
+        finalizeOutcomeStatus(outcome, text: text)
+    }
+
+    private func applyCost(usage: TokenUsage) -> Double? {
+        let cost = computeCost(provider: settings.provider, model: selectedModel ?? "", usage: usage)
+        lastCost = CostSnapshot(usage: usage, costUSD: cost)
         if let cost {
             sessionCostUSD += cost
             dayCostUSD += cost
         }
-        appendHistory(HistoryDraft(original: outcome.original, output: text, diff: diffText, action: outcome.action, usage: outcome.response.usage, costUSD: cost))
-        appendUsage(model: selectedModel ?? "", usage: outcome.response.usage, costUSD: cost)
-        if settings.editorLayout == .inline {
-            inlineHighlightRanges = InlineDiffService.changedRanges(original: outcome.original, corrected: text)
-            suppressNextInputChange = true
-            inputText = text
-            DraftStore.save(inputText)
-            lastAutoSubmittedHash = inputText.hashValue
-        }
+        return cost
+    }
+
+    private func applyInlineSubstitution(original: String, text: String) {
+        inlineHighlightRanges = InlineDiffService.changedRanges(original: original, corrected: text)
+        suppressNextInputChange = true
+        inputText = text
+        DraftStore.save(inputText)
+        lastAutoSubmittedHash = inputText.hashValue
+    }
+
+    private func finalizeOutcomeStatus(_ outcome: ActionOutcome, text: String) {
         if settings.autoCopy {
             copyOutput(text)
         } else {

@@ -127,68 +127,6 @@ final class AppState: ObservableObject {
         saveSettings()
     }
 
-    func addMode() {
-        let action = EditAction(id: UUID().uuidString, title: "New mode", instruction: "Edit the text according to this instruction.", isEnabled: true)
-        actions.append(action)
-        setCurrentAction(action.id)
-        saveModes()
-    }
-
-    func deleteMode(_ action: EditAction) {
-        guard actions.count > 1 else { return }
-        actions.removeAll { $0.id == action.id }
-        if settings.currentActionID == action.id { settings.currentActionID = enabledActions.first?.id ?? actions.first?.id ?? "correct" }
-        saveModes()
-        saveSettings()
-    }
-
-    func updateMode(_ action: EditAction) {
-        guard let index = actions.firstIndex(where: { $0.id == action.id }) else { return }
-        actions[index] = action
-        saveModes()
-    }
-
-    func toggleModeEnabled(_ actionID: String) {
-        guard let index = actions.firstIndex(where: { $0.id == actionID }) else { return }
-        actions[index].isEnabled.toggle()
-        if !actions[index].isEnabled, settings.currentActionID == actionID {
-            settings.currentActionID = enabledActions.first?.id ?? actions[index].id
-            saveSettings()
-        }
-        saveModes()
-    }
-
-    func restoreHistory(_ entry: HistoryEntry, useOutput: Bool = false) {
-        pushEditorUndoSnapshot()
-        inputText = useOutput ? entry.output : entry.input
-        outputText = entry.output
-        diffText = entry.diff
-        settings.provider = entry.provider
-        settings.modelByProvider[entry.provider] = entry.model
-        settings.currentActionID = entry.actionID
-        status = "Restored"
-        DraftStore.save(inputText)
-        saveSettings()
-    }
-
-    func isAcceptedModel(_ modelID: String, provider: ProviderKind? = nil) -> Bool {
-        let provider = provider ?? settings.provider
-        return Set(settings.acceptedModelIDsByProvider[provider] ?? []).contains(modelID)
-    }
-
-    func toggleAcceptedModel(_ modelID: String, provider: ProviderKind? = nil) {
-        let provider = provider ?? settings.provider
-        var values = settings.acceptedModelIDsByProvider[provider] ?? []
-        if values.contains(modelID) {
-            values.removeAll { $0 == modelID }
-        } else {
-            values.append(modelID)
-        }
-        settings.acceptedModelIDsByProvider[provider] = values
-        status = values.isEmpty ? "Browsing all models" : "Browsing \(values.count) accepted models"
-        saveSettings()
-    }
-
     func requestHide() {
         onHideRequested?()
     }
@@ -208,51 +146,5 @@ final class AppState: ObservableObject {
 
     func requestSettings() {
         onSettingsRequested?()
-    }
-
-    func copyOutput(_ text: String? = nil) {
-        let value = (text ?? outputText).trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !value.isEmpty else { return }
-        ClipboardService.copy(value)
-        status = "Copied"
-        if settings.hideAfterCopy { onHideRequested?() }
-    }
-
-    func handleShortcut(_ rawShortcut: String) -> Bool {
-        let shortcut = ShortcutFormatter.normalize(rawShortcut)
-        guard !shortcut.isEmpty else { return false }
-
-        for action in enabledActions {
-            if ShortcutFormatter.normalize(settings.shortcutByAction[action.id] ?? "") == shortcut {
-                setCurrentAction(action.id)
-                return true
-            }
-        }
-
-        if ShortcutFormatter.normalize(settings.nextModelShortcut) == shortcut {
-            selectAdjacentModel(direction: 1)
-            return true
-        }
-        if ShortcutFormatter.normalize(settings.previousModelShortcut) == shortcut {
-            selectAdjacentModel(direction: -1)
-            return true
-        }
-
-        for provider in ProviderKind.allCases {
-            for model in modelsByProvider[provider] ?? [] {
-                let key = settings.modelShortcutKey(provider: provider, modelID: model.id)
-                if ShortcutFormatter.normalize(settings.shortcutByModel[key] ?? "") == shortcut {
-                    setSelectedModel(model.id, provider: provider)
-                    return true
-                }
-            }
-        }
-        return false
-    }
-
-    func toggleAlwaysOnTop() {
-        settings.alwaysOnTop.toggle()
-        onAlwaysOnTopChanged?(settings.alwaysOnTop)
-        saveSettings()
     }
 }

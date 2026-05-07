@@ -14,44 +14,44 @@ extension AppDelegate {
         DebugLog.log("import begin nsAppActive=\(NSApp.isActive)")
         if NSApp.isActive {
             DebugLog.log("import skipped because Retypo is active; running all modes")
-            Task { [weak state] in
-                await state?.runAllEnabledModes()
-            }
+            Task { [weak state] in await state?.runAllEnabledModes() }
             return
         }
-
-        guard let sourceApplication = NSWorkspace.shared.frontmostApplication,
-              sourceApplication.processIdentifier != NSRunningApplication.current.processIdentifier else {
-            DebugLog.log("import failed: no external frontmost app. frontmost=\(NSWorkspace.shared.frontmostApplication?.localizedName ?? "nil")")
-            showPanel()
-            state?.status = "No external app focused"
-            return
-        }
-
+        guard let sourceApplication = resolveExternalSource() else { return }
         previousApplication = sourceApplication
         let sourceName = sourceApplication.localizedName ?? "frontmost app"
         DebugLog.log("import source name=\(sourceName) bundle=\(sourceApplication.bundleIdentifier ?? "nil") pid=\(sourceApplication.processIdentifier)")
-        let trustedForAccessibility = requestAccessibilityTrustIfNeeded()
-        DebugLog.log("accessibility trusted=\(trustedForAccessibility)")
-
-        if trustedForAccessibility,
-           let selectedText = selectedTextViaAccessibility(from: sourceApplication),
-           !selectedText.trimmingCharacters(in: .newlines).isEmpty {
-            DebugLog.log("import success via AXSelectedText length=\(selectedText.count)")
-            let needsConfirmation = state?.receiveExternalImport(selectedText, source: sourceName) ?? false
-            showPanel()
-            if needsConfirmation { auxiliaryPanels?.setImportPromptVisible(true) }
-            return
-        }
-
+        let trusted = requestAccessibilityTrustIfNeeded()
+        DebugLog.log("accessibility trusted=\(trusted)")
+        if trusted, importViaAXSelectedText(application: sourceApplication, sourceName: sourceName) { return }
         guard allowClipboardFallback else {
             DebugLog.log("fast import found no AXSelectedText; opening panel without clipboard fallback")
             showPanel()
             state?.status = "No selected text imported"
             return
         }
+        startClipboardPoll(sourceApplication: sourceApplication, sourceName: sourceName, trustedForAccessibility: trusted)
+    }
 
-        startClipboardPoll(sourceApplication: sourceApplication, sourceName: sourceName, trustedForAccessibility: trustedForAccessibility)
+    private func resolveExternalSource() -> NSRunningApplication? {
+        guard let app = NSWorkspace.shared.frontmostApplication,
+              app.processIdentifier != NSRunningApplication.current.processIdentifier else {
+            DebugLog.log("import failed: no external frontmost app. frontmost=\(NSWorkspace.shared.frontmostApplication?.localizedName ?? "nil")")
+            showPanel()
+            state?.status = "No external app focused"
+            return nil
+        }
+        return app
+    }
+
+    private func importViaAXSelectedText(application: NSRunningApplication, sourceName: String) -> Bool {
+        guard let selectedText = selectedTextViaAccessibility(from: application),
+              !selectedText.trimmingCharacters(in: .newlines).isEmpty else { return false }
+        DebugLog.log("import success via AXSelectedText length=\(selectedText.count)")
+        let needsConfirmation = state?.receiveExternalImport(selectedText, source: sourceName) ?? false
+        showPanel()
+        if needsConfirmation { auxiliaryPanels?.setImportPromptVisible(true) }
+        return true
     }
 
     private func startClipboardPoll(sourceApplication: NSRunningApplication, sourceName: String, trustedForAccessibility: Bool) {

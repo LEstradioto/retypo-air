@@ -34,30 +34,28 @@ enum InlineDiffService {
 
     private static func lcsPairs(_ old: [String], _ new: [String]) -> [(oldIndex: Int, newIndex: Int)] {
         guard !old.isEmpty, !new.isEmpty else { return [] }
+        let dp = lcsTable(old: old, new: new)
+        return walkLCS(old: old, new: new, dp: dp)
+    }
+
+    private static func lcsTable(old: [String], new: [String]) -> [[Int]] {
         var dp = Array(repeating: Array(repeating: 0, count: new.count + 1), count: old.count + 1)
         for i in stride(from: old.count - 1, through: 0, by: -1) {
             for j in stride(from: new.count - 1, through: 0, by: -1) {
-                if old[i] == new[j] {
-                    dp[i][j] = dp[i + 1][j + 1] + 1
-                } else {
-                    dp[i][j] = max(dp[i + 1][j], dp[i][j + 1])
-                }
+                dp[i][j] = old[i] == new[j] ? dp[i + 1][j + 1] + 1 : max(dp[i + 1][j], dp[i][j + 1])
             }
         }
+        return dp
+    }
 
+    private static func walkLCS(old: [String], new: [String], dp: [[Int]]) -> [(oldIndex: Int, newIndex: Int)] {
         var pairs: [(Int, Int)] = []
         var i = 0
         var j = 0
         while i < old.count, j < new.count {
-            if old[i] == new[j] {
-                pairs.append((i, j))
-                i += 1
-                j += 1
-            } else if dp[i + 1][j] >= dp[i][j + 1] {
-                i += 1
-            } else {
-                j += 1
-            }
+            if old[i] == new[j] { pairs.append((i, j)); i += 1; j += 1 }
+            else if dp[i + 1][j] >= dp[i][j + 1] { i += 1 }
+            else { j += 1 }
         }
         return pairs
     }

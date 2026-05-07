@@ -30,66 +30,69 @@ extension SettingsView {
     private func modeRow(_ action: EditAction) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 10) {
-                Toggle("", isOn: Binding(get: { action.isEnabled }, set: { _ in state.toggleModeEnabled(action.id) }))
-                    .toggleStyle(.checkbox)
-                    .labelsHidden()
-                    .settingsFocus(modeFocusID(action.id, "enabled"), radius: 6, keyboardFocusable: true, activate: {
-                        state.toggleModeEnabled(action.id)
-                        return true
-                    })
-                Button(action.title) { state.setCurrentAction(action.id) }
-                    .buttonStyle(SettingsCapsuleButtonStyle(active: state.currentAction.id == action.id))
-                    .settingsFocus(modeFocusID(action.id, "select"), radius: 12, keyboardFocusable: true, activate: {
-                        state.setCurrentAction(action.id)
-                        return true
-                    })
-                    .frame(width: 110, alignment: .leading)
-                Text(action.instruction)
-                    .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
+                modeEnabledToggle(action)
+                modeSelectButton(action)
+                Text(action.instruction).font(.system(size: 12)).foregroundStyle(.secondary).lineLimit(1)
                 Spacer()
                 Text(state.settings.shortcutByAction[action.id] ?? "")
                     .font(.system(size: 11, weight: .medium, design: .monospaced))
                     .foregroundStyle(.tertiary)
-                Button {
-                    let willOpen = editingModeID != action.id
-                    editingModeID = willOpen ? action.id : nil
-                    if willOpen {
-                        DispatchQueue.main.async {
-                            settingsFocus.focus(modeFocusID(action.id, "title"))
-                        }
-                    }
-                } label: {
-                    Image(systemName: "pencil")
-                }
-                .buttonStyle(SettingsIconButtonStyle())
-                .settingsFocus(modeFocusID(action.id, "edit"), radius: 13, keyboardFocusable: true, activate: {
-                    let willOpen = editingModeID != action.id
-                    editingModeID = willOpen ? action.id : nil
-                    if willOpen {
-                        DispatchQueue.main.async {
-                            settingsFocus.focus(modeFocusID(action.id, "title"))
-                        }
-                    }
-                    return true
-                })
-                Button { state.deleteMode(action) } label: {
-                    Image(systemName: "trash")
-                }
-                .buttonStyle(SettingsIconButtonStyle(destructive: true))
-                .settingsFocus(modeFocusID(action.id, "delete"), radius: 13, keyboardFocusable: true, activate: {
-                    state.deleteMode(action)
-                    return true
-                })
-                .disabled(state.actions.count <= 1)
+                modeEditButton(action)
+                modeDeleteButton(action)
             }
-            if editingModeID == action.id {
-                modeEditor(action)
-            }
+            if editingModeID == action.id { modeEditor(action) }
         }
         .padding(10)
         .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Color.black.opacity(0.045)))
+    }
+
+    private func modeEnabledToggle(_ action: EditAction) -> some View {
+        Toggle("", isOn: Binding(get: { action.isEnabled }, set: { _ in state.toggleModeEnabled(action.id) }))
+            .toggleStyle(.checkbox)
+            .labelsHidden()
+            .settingsFocus(modeFocusID(action.id, "enabled"), radius: 6, keyboardFocusable: true, activate: {
+                state.toggleModeEnabled(action.id)
+                return true
+            })
+    }
+
+    private func modeSelectButton(_ action: EditAction) -> some View {
+        Button(action.title) { state.setCurrentAction(action.id) }
+            .buttonStyle(SettingsCapsuleButtonStyle(active: state.currentAction.id == action.id))
+            .settingsFocus(modeFocusID(action.id, "select"), radius: 12, keyboardFocusable: true, activate: {
+                state.setCurrentAction(action.id)
+                return true
+            })
+            .frame(width: 110, alignment: .leading)
+    }
+
+    private func modeEditButton(_ action: EditAction) -> some View {
+        Button { toggleModeEditor(action.id) } label: { Image(systemName: "pencil") }
+            .buttonStyle(SettingsIconButtonStyle())
+            .settingsFocus(modeFocusID(action.id, "edit"), radius: 13, keyboardFocusable: true, activate: {
+                toggleModeEditor(action.id)
+                return true
+            })
+    }
+
+    private func modeDeleteButton(_ action: EditAction) -> some View {
+        Button { state.deleteMode(action) } label: { Image(systemName: "trash") }
+            .buttonStyle(SettingsIconButtonStyle(destructive: true))
+            .settingsFocus(modeFocusID(action.id, "delete"), radius: 13, keyboardFocusable: true, activate: {
+                state.deleteMode(action)
+                return true
+            })
+            .disabled(state.actions.count <= 1)
+    }
+
+    private func toggleModeEditor(_ actionID: String) {
+        let willOpen = editingModeID != actionID
+        editingModeID = willOpen ? actionID : nil
+        if willOpen {
+            DispatchQueue.main.async {
+                settingsFocus.focus(modeFocusID(actionID, "title"))
+            }
+        }
     }
 
     private func modeEditor(_ action: EditAction) -> some View {
