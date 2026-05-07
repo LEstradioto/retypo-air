@@ -1,0 +1,17 @@
+# Periphery — unused-code analysis
+# See .claude/skills/apply-quality-gates/SKILL.md
+#
+# This is a single-target SPM executable; default detection works.
+
+format: json
+retain_public: false
+retain_objc_accessible: true        # AppDelegate / NSApplication entry points
+retain_objc_annotated: true
+retain_assign_only_properties: true # @Published / Codable JSON fields are read by SwiftUI / encoders
+retain_swift_ui_previews: true
+disable_unused_import_analysis: false
+
+# Cosmetic excludes from the report (still indexed).
+report_exclude:
+  - "**/.build/**"
+  - "**/build-dev/**"

@@ -1,0 +1,58 @@
+#!/usr/bin/env bash
+# Re-capture current counts as the new baseline. Run only after a deliberate
+# improvement (or initial bootstrap). Commits the new quality_thresholds.json.
+#
+# See .claude/skills/apply-quality-gates/SKILL.md
+
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$ROOT"
+
+OUT="tmp/quality"
+mkdir -p "$OUT"
+
+swiftlint lint --reporter json > "$OUT/swiftlint.json" 2>/dev/null || true
+periphery scan --format json   > "$OUT/periphery.json" 2>/dev/null || true
+
+python3 - "$OUT/swiftlint.json" "$OUT/periphery.json" <<'PY'
+import json, sys, datetime
+
+sl = json.load(open(sys.argv[1]))
+ph = json.load(open(sys.argv[2]))
+
+from collections import Counter
+rules = Counter(v["rule_id"] for v in sl)
+
+baseline = {
+    "_comment": "Ratcheted baseline — see .claude/skills/apply-quality-gates/SKILL.md. Lower numbers via `bin/quality-bump`. Any PR that grows a count fails `bin/quality`.",
+    "_captured_at": datetime.date.today().isoformat(),
+    "swiftlint": {
+        "cyclomatic_complexity":    rules.get("cyclomatic_complexity", 0),
+        "function_body_length":     rules.get("function_body_length", 0),
+        "type_body_length":         rules.get("type_body_length", 0),
+        "file_length":              rules.get("file_length", 0),
+        "function_parameter_count": rules.get("function_parameter_count", 0),
+        "force_unwrapping":         rules.get("force_unwrapping", 0),
+        "total_warnings":           len(sl),
+    },
+    "periphery": {
+        "unused_declarations": len(ph),
+    },
+    "_skipped": {
+        "coverage": "no test target yet",
+        "branch_coverage": "Apple platforms expose only line coverage natively",
+        "mutation_kill_ratio": "blocked on test target",
+        "dependency_structure": "single SPM target — architecture-theatre at this size",
+    },
+}
+
+with open("quality_thresholds.json", "w") as f:
+    json.dump(baseline, f, indent=2)
+    f.write("\n")
+
+print("quality_thresholds.json updated:")
+for k, v in baseline["swiftlint"].items():
+    print(f"  swiftlint.{k:<28} {v}")
+print(f"  periphery.unused_declarations  {baseline['periphery']['unused_declarations']}")
+PY

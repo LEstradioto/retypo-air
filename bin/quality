@@ -1,0 +1,80 @@
+#!/usr/bin/env bash
+# Run all enabled quality gates, compare counts to quality_thresholds.json,
+# print a table, exit non-zero on any regression.
+#
+# See .claude/skills/apply-quality-gates/SKILL.md
+
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$ROOT"
+
+OUT="tmp/quality"
+mkdir -p "$OUT"
+
+THRESHOLDS="quality_thresholds.json"
+[ -f "$THRESHOLDS" ] || { echo "missing $THRESHOLDS"; exit 2; }
+
+require() { command -v "$1" >/dev/null 2>&1 || { echo "missing tool: $1 (brew install $1)"; exit 2; }; }
+require swiftlint
+require periphery
+require python3
+
+echo "==> SwiftLint"
+swiftlint lint --reporter json > "$OUT/swiftlint.json" 2>/dev/null || true
+
+echo "==> Periphery"
+periphery scan --format json > "$OUT/periphery.json" 2>/dev/null || true
+
+python3 - "$THRESHOLDS" "$OUT/swiftlint.json" "$OUT/periphery.json" <<'PY'
+import json, sys
+
+thresholds_path, sl_path, ph_path = sys.argv[1], sys.argv[2], sys.argv[3]
+T = json.load(open(thresholds_path))
+sl = json.load(open(sl_path)) if open(sl_path).read(1) else []
+# rewind: re-read since we consumed a byte for the truthy check
+sl = json.load(open(sl_path))
+ph = json.load(open(ph_path))
+
+# Tally SwiftLint by rule_id
+from collections import Counter
+rules = Counter(v["rule_id"] for v in sl)
+total_warnings = len(sl)
+
+# Tally Periphery
+unused = len(ph)
+
+tracked = [
+    ("cyclomatic_complexity",     rules.get("cyclomatic_complexity", 0),     T["swiftlint"]["cyclomatic_complexity"]),
+    ("function_body_length",      rules.get("function_body_length", 0),      T["swiftlint"]["function_body_length"]),
+    ("type_body_length",          rules.get("type_body_length", 0),          T["swiftlint"]["type_body_length"]),
+    ("file_length",               rules.get("file_length", 0),               T["swiftlint"]["file_length"]),
+    ("function_parameter_count",  rules.get("function_parameter_count", 0),  T["swiftlint"]["function_parameter_count"]),
+    ("force_unwrapping",          rules.get("force_unwrapping", 0),          T["swiftlint"]["force_unwrapping"]),
+    ("swiftlint_total",           total_warnings,                            T["swiftlint"]["total_warnings"]),
+    ("periphery_unused",          unused,                                    T["periphery"]["unused_declarations"]),
+]
+
+print()
+print("Quality gates")
+print("=" * 60)
+print(f"{'metric':<30} {'now':>6}  {'<=':>4} {'limit':>6}  {'':>4}")
+print("-" * 60)
+ok = True
+for name, now, limit in tracked:
+    sign = "OK" if now <= limit else "FAIL"
+    if now > limit:
+        ok = False
+    arrow = "<=" if now <= limit else " >"
+    print(f"{name:<30} {now:>6}  {arrow:>4} {limit:>6}  {sign:>4}")
+print("-" * 60)
+if ok:
+    n = len(tracked)
+    print(f"{n}/{n} gates passed.")
+    sys.exit(0)
+else:
+    failures = [n for n, now, lim in tracked if now > lim]
+    print(f"FAILED gates: {', '.join(failures)}")
+    print("If improvement was intentional and you LOWERED counts, run `bin/quality-bump`.")
+    sys.exit(1)
+PY

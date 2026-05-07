@@ -1,0 +1,54 @@
+# Quality-gate thresholds — see .claude/skills/apply-quality-gates/SKILL.md
+#
+# Severity is `warning` everywhere. The gate is the count diff vs.
+# quality_thresholds.json, NOT the lint failing the build.
+
+included:
+  - Sources
+
+excluded:
+  - .build
+  - build-dev
+  - .swiftpm-modulecache
+
+# Disable line_length — caught by default rules already, not in our 5-metric set.
+disabled_rules:
+  - line_length
+  - identifier_name        # noisy on `id`, `i`, single-letter math vars
+  - void_function_in_ternary
+
+# The five core metrics the playbook tracks.
+cyclomatic_complexity:
+  warning: 6
+  error: 6                 # same value — we never want hard error, but ratchet on count
+  ignores_case_statements: false
+
+function_body_length:
+  warning: 15
+  error: 15
+
+type_body_length:
+  warning: 100
+  error: 100
+
+file_length:
+  warning: 100
+  error: 200               # generated/declarative files get a soft ceiling at 200
+
+function_parameter_count:
+  warning: 4
+  error: 4
+
+# Useful opt-ins that align with the playbook spirit (early returns, no force).
+opt_in_rules:
+  - empty_count
+  - explicit_init
+  - first_where
+  - force_unwrapping
+  - implicitly_unwrapped_optional
+  - last_where
+  - redundant_nil_coalescing
+  - sorted_first_last
+  - toggle_bool
+
+reporter: "xcode"
