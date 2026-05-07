@@ -2,7 +2,7 @@ import Foundation
 
 final class AnthropicProvider: LLMProviderClient {
     let kind: ProviderKind = .anthropic
-    private let baseURL = URL(string: "https://api.anthropic.com/v1")!
+    private let baseURL = URL(staticString: "https://api.anthropic.com/v1")
 
     func complete(_ request: LLMRequest, apiKey: String) async throws -> LLMResponse {
         let url = baseURL.appendingPathComponent("messages")

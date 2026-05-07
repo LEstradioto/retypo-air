@@ -2,8 +2,8 @@ import Foundation
 
 final class OpenAIResponsesProvider: LLMProviderClient {
     let kind: ProviderKind = .openai
-    private let baseURL = URL(string: "https://api.openai.com/v1")!
-    private let modelProvider = OpenAICompatibleProvider(kind: .openai, baseURL: URL(string: "https://api.openai.com/v1")!)
+    private let baseURL = URL(staticString: "https://api.openai.com/v1")
+    private let modelProvider = OpenAICompatibleProvider(kind: .openai, baseURL: URL(staticString: "https://api.openai.com/v1"))
 
     func complete(_ request: LLMRequest, apiKey: String) async throws -> LLMResponse {
         let url = baseURL.appendingPathComponent("responses")

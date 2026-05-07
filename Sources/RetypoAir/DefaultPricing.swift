@@ -55,41 +55,46 @@ enum DefaultPricing {
         "groq::gpt-oss-120b": .init(inputPerMillion: 0.15, outputPerMillion: 0.60)
     ]
 
+    /// Pattern table per provider. Order matters: more specific prefixes first
+    /// so the first substring match wins.
+    private static let patterns: [ProviderKind: [(String, ModelPricing)]] = [
+        .anthropic: [
+            ("opus-4-7", .init(inputPerMillion: 5, outputPerMillion: 25)),
+            ("opus-4-6", .init(inputPerMillion: 5, outputPerMillion: 25)),
+            ("opus-4-5", .init(inputPerMillion: 5, outputPerMillion: 25)),
+            ("opus", .init(inputPerMillion: 15, outputPerMillion: 75)),
+            ("haiku-4-5", .init(inputPerMillion: 1, outputPerMillion: 5)),
+            ("haiku-3-5", .init(inputPerMillion: 0.80, outputPerMillion: 4)),
+            ("sonnet", .init(inputPerMillion: 3, outputPerMillion: 15)),
+            ("haiku", .init(inputPerMillion: 0.25, outputPerMillion: 1.25))
+        ],
+        .groq: [
+            ("gpt-oss-120b", .init(inputPerMillion: 0.15, outputPerMillion: 0.60)),
+            ("gpt-oss-20b", .init(inputPerMillion: 0.075, outputPerMillion: 0.30))
+        ],
+        .openai: [
+            ("gpt-5.5", .init(inputPerMillion: 5.00, outputPerMillion: 30.00)),
+            ("gpt-5.4-mini", .init(inputPerMillion: 0.75, outputPerMillion: 4.50)),
+            ("gpt-5.4", .init(inputPerMillion: 2.50, outputPerMillion: 15.00)),
+            ("gpt-5.2-pro", .init(inputPerMillion: 21.00, outputPerMillion: 168.00)),
+            ("gpt-5.2", .init(inputPerMillion: 1.75, outputPerMillion: 14)),
+            ("gpt-5-pro", .init(inputPerMillion: 15.00, outputPerMillion: 120.00)),
+            ("gpt-5-mini", .init(inputPerMillion: 0.25, outputPerMillion: 2)),
+            ("gpt-5-nano", .init(inputPerMillion: 0.05, outputPerMillion: 0.40)),
+            ("gpt-5", .init(inputPerMillion: 1.25, outputPerMillion: 10)),
+            ("gpt-4.1-mini", .init(inputPerMillion: 0.40, outputPerMillion: 1.60)),
+            ("gpt-4.1-nano", .init(inputPerMillion: 0.10, outputPerMillion: 0.40)),
+            ("gpt-4.1", .init(inputPerMillion: 2, outputPerMillion: 8)),
+            ("gpt-4o-mini", .init(inputPerMillion: 0.15, outputPerMillion: 0.60)),
+            ("gpt-4o", .init(inputPerMillion: 2.50, outputPerMillion: 10))
+        ],
+        .openrouter: []
+    ]
+
     static func pricing(provider: ProviderKind, modelID: String) -> ModelPricing? {
         let key = PricingStore.key(provider: provider, model: modelID)
         if let value = exact[key] { return value }
         let normalized = modelID.lowercased()
-        switch provider {
-        case .anthropic:
-            if normalized.contains("opus") && (normalized.contains("4-7") || normalized.contains("4-6") || normalized.contains("4-5")) {
-                return .init(inputPerMillion: 5, outputPerMillion: 25)
-            }
-            if normalized.contains("opus") { return .init(inputPerMillion: 15, outputPerMillion: 75) }
-            if normalized.contains("sonnet") { return .init(inputPerMillion: 3, outputPerMillion: 15) }
-            if normalized.contains("haiku") && normalized.contains("4-5") { return .init(inputPerMillion: 1, outputPerMillion: 5) }
-            if normalized.contains("haiku") && normalized.contains("3-5") { return .init(inputPerMillion: 0.80, outputPerMillion: 4) }
-            if normalized.contains("haiku") { return .init(inputPerMillion: 0.25, outputPerMillion: 1.25) }
-        case .groq:
-            if normalized.contains("gpt-oss-120b") { return .init(inputPerMillion: 0.15, outputPerMillion: 0.60) }
-            if normalized.contains("gpt-oss-20b") { return .init(inputPerMillion: 0.075, outputPerMillion: 0.30) }
-        case .openai:
-            if normalized.contains("gpt-5.5") { return .init(inputPerMillion: 5.00, outputPerMillion: 30.00) }
-            if normalized.contains("gpt-5.4-mini") { return .init(inputPerMillion: 0.75, outputPerMillion: 4.50) }
-            if normalized.contains("gpt-5.4") { return .init(inputPerMillion: 2.50, outputPerMillion: 15.00) }
-            if normalized.contains("gpt-5.2-pro") { return .init(inputPerMillion: 21.00, outputPerMillion: 168.00) }
-            if normalized.contains("gpt-5.2") { return .init(inputPerMillion: 1.75, outputPerMillion: 14) }
-            if normalized.contains("gpt-5-pro") { return .init(inputPerMillion: 15.00, outputPerMillion: 120.00) }
-            if normalized.contains("gpt-5-mini") { return .init(inputPerMillion: 0.25, outputPerMillion: 2) }
-            if normalized.contains("gpt-5-nano") { return .init(inputPerMillion: 0.05, outputPerMillion: 0.40) }
-            if normalized.contains("gpt-5") { return .init(inputPerMillion: 1.25, outputPerMillion: 10) }
-            if normalized.contains("gpt-4.1-mini") { return .init(inputPerMillion: 0.40, outputPerMillion: 1.60) }
-            if normalized.contains("gpt-4.1-nano") { return .init(inputPerMillion: 0.10, outputPerMillion: 0.40) }
-            if normalized.contains("gpt-4.1") { return .init(inputPerMillion: 2, outputPerMillion: 8) }
-            if normalized.contains("gpt-4o-mini") { return .init(inputPerMillion: 0.15, outputPerMillion: 0.60) }
-            if normalized.contains("gpt-4o") { return .init(inputPerMillion: 2.50, outputPerMillion: 10) }
-        case .openrouter:
-            return nil
-        }
-        return nil
+        return patterns[provider]?.first { normalized.contains($0.0) }?.1
     }
 }

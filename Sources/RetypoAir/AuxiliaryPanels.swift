@@ -19,7 +19,7 @@ final class AuxiliaryPanelController {
         guard let state else { return }
         state.showSettings = true
         if settingsPanel == nil {
-            let panel = makePanel(width: 780, height: 720, minWidth: 560, minHeight: 420, radius: 24)
+            let panel = makePanel(width: 780, height: 720, minWidth: 560, minHeight: 420)
             panel.contentView = roundedHostingView(rootView: SettingsView().environmentObject(state).environmentObject(settingsFocus), radius: 24)
             panel.onTabKey = { [weak self] in
                 self?.settingsFocus.advance(reverse: false)
@@ -64,7 +64,7 @@ final class AuxiliaryPanelController {
     func showCandidates() {
         guard let state else { return }
         if candidatesPanel == nil {
-            let panel = makePanel(width: 900, height: 230, minWidth: 240, minHeight: 140, radius: 18)
+            let panel = makePanel(width: 900, height: 230, minWidth: 240, minHeight: 140)
             panel.contentView = roundedHostingView(rootView: CandidateOverlayWindowView().environmentObject(state), radius: 18)
             panel.onTabKey = { [weak state] in
                 guard let state else { return }
@@ -102,11 +102,7 @@ final class AuxiliaryPanelController {
         }
     }
 
-    func hideCandidates() {
-        candidatesPanel?.orderOut(nil)
-    }
-
-    func hideCandidates(focusMain: Bool) {
+    func hideCandidates(focusMain: Bool = false) {
         candidatesPanel?.orderOut(nil)
         state?.showCandidateOverlay = false
         if focusMain { focusMainEditor() }
@@ -119,7 +115,7 @@ final class AuxiliaryPanelController {
     func showImportPrompt() {
         guard let state else { return }
         if importPromptPanel == nil {
-            let panel = makePanel(width: 460, height: 92, minWidth: 340, minHeight: 78, radius: 18)
+            let panel = makePanel(width: 460, height: 92, minWidth: 340, minHeight: 78)
             panel.contentView = roundedHostingView(rootView: ImportConfirmWindowView().environmentObject(state), radius: 18)
             panel.onEnterKey = { [weak state] in
                 state?.confirmPendingImport()
@@ -162,7 +158,7 @@ final class AuxiliaryPanelController {
         }
     }
 
-    private func makePanel(width: CGFloat, height: CGFloat, minWidth: CGFloat, minHeight: CGFloat, radius: CGFloat) -> KeyableAuxiliaryPanel {
+    private func makePanel(width: CGFloat, height: CGFloat, minWidth: CGFloat, minHeight: CGFloat) -> KeyableAuxiliaryPanel {
         let panel = KeyableAuxiliaryPanel(
             contentRect: NSRect(x: 0, y: 0, width: width, height: height),
             styleMask: [.borderless, .resizable],
@@ -180,65 +176,6 @@ final class AuxiliaryPanelController {
         panel.level = .floating
         panel.isMovableByWindowBackground = true
         return panel
-    }
-
-    private func focusFirstControl(in panel: NSPanel) {
-        focusNextControl(in: panel, reverse: false, wrapFromCurrent: false)
-    }
-
-    private func focusNextControl(in panel: NSPanel?, reverse: Bool, wrapFromCurrent: Bool = true) {
-        guard let panel, let contentView = panel.contentView else { return }
-        let controls = focusableControls(in: contentView)
-        guard !controls.isEmpty else {
-            panel.makeFirstResponder(contentView)
-            return
-        }
-
-        let current = currentFocusedControl(in: panel, controls: controls)
-        let nextIndex: Int
-        if wrapFromCurrent, let current, let index = controls.firstIndex(of: current) {
-            nextIndex = (index + (reverse ? -1 : 1) + controls.count) % controls.count
-        } else {
-            nextIndex = reverse ? controls.count - 1 : 0
-        }
-        panel.makeFirstResponder(controls[nextIndex])
-    }
-
-    private func focusableControls(in view: NSView) -> [NSView] {
-        var result: [NSView] = []
-        if isFocusableControl(view) {
-            result.append(view)
-        }
-        for subview in view.subviews {
-            result.append(contentsOf: focusableControls(in: subview))
-        }
-        return result
-    }
-
-    private func isFocusableControl(_ view: NSView) -> Bool {
-        guard !view.isHidden, view.alphaValue > 0.01 else { return false }
-        if let control = view as? NSControl {
-            return control.isEnabled && (control is NSButton || control is NSTextField || control is NSPopUpButton || control is NSSegmentedControl)
-        }
-        if let textView = view as? NSTextView {
-            return textView.isEditable || textView.isSelectable
-        }
-        return false
-    }
-
-    private func currentFocusedControl(in panel: NSPanel, controls: [NSView]) -> NSView? {
-        if let responder = panel.firstResponder as? NSView {
-            if let direct = controls.first(where: { $0 === responder }) {
-                return direct
-            }
-            if let descendant = controls.first(where: { responder.isDescendant(of: $0) || $0.isDescendant(of: responder) }) {
-                return descendant
-            }
-            if let fieldEditor = responder as? NSTextView, let delegateView = fieldEditor.delegate as? NSView {
-                return controls.first(where: { $0 === delegateView || delegateView.isDescendant(of: $0) || $0.isDescendant(of: delegateView) })
-            }
-        }
-        return nil
     }
 
     private func focusMainEditor() {
@@ -299,14 +236,6 @@ final class AuxiliaryPanelController {
 
 
 private extension NSView {
-    func firstSubview(where predicate: (NSView) -> Bool) -> NSView? {
-        if predicate(self) { return self }
-        for subview in subviews {
-            if let found = subview.firstSubview(where: predicate) { return found }
-        }
-        return nil
-    }
-
     func firstSubview<T: NSView>(of type: T.Type) -> T? {
         if let view = self as? T { return view }
         for subview in subviews {

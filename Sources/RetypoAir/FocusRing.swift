@@ -49,30 +49,6 @@ final class SettingsFocusCoordinator: ObservableObject {
     }
 }
 
-struct FocusRingStyle: ViewModifier {
-    @FocusState private var isFocused: Bool
-    var radius: CGFloat = 8
-    var keyboardFocusable: Bool = false
-
-    func body(content: Content) -> some View {
-        if keyboardFocusable {
-            content
-                .focusable(true)
-                .focused($isFocused)
-                .overlay(focusOverlay)
-        } else {
-            content
-                .focused($isFocused)
-                .overlay(focusOverlay)
-        }
-    }
-
-    private var focusOverlay: some View {
-        RoundedRectangle(cornerRadius: radius, style: .continuous)
-            .strokeBorder(isFocused ? Color.accentColor.opacity(0.72) : Color.clear, lineWidth: 1.5)
-    }
-}
-
 struct SettingsFocusStyle: ViewModifier {
     @EnvironmentObject private var coordinator: SettingsFocusCoordinator
     @FocusState private var isNativeFocused: Bool
@@ -120,10 +96,6 @@ struct SettingsFocusStyle: ViewModifier {
 }
 
 extension View {
-    func focusRing(radius: CGFloat = 8, keyboardFocusable: Bool = false) -> some View {
-        modifier(FocusRingStyle(radius: radius, keyboardFocusable: keyboardFocusable))
-    }
-
     func settingsFocus(_ id: String, radius: CGFloat = 8, keyboardFocusable: Bool = false, activate: (() -> Bool)? = nil) -> some View {
         modifier(SettingsFocusStyle(id: id, radius: radius, keyboardFocusable: keyboardFocusable, activate: activate))
     }

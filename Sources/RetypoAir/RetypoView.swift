@@ -191,7 +191,7 @@ struct RetypoView: View {
 
     private var stackedEditor: some View {
         VStack(spacing: isLighter ? 6 : 8) {
-            editorBox(title: "Draft", minHeight: 44)
+            editorBox(minHeight: 44)
             outputBox
         }
         .padding(.horizontal, isLighter ? 6 : 8)
@@ -199,12 +199,12 @@ struct RetypoView: View {
     }
 
     private var inlineEditor: some View {
-        editorBox(title: "Inline editor", minHeight: 72)
+        editorBox(minHeight: 72)
             .padding(.horizontal, isLighter ? 6 : 8)
             .padding(.bottom, isLighter ? 1 : 2)
     }
 
-    private func editorBox(title: String, minHeight: CGFloat) -> some View {
+    private func editorBox(minHeight: CGFloat) -> some View {
         VStack(alignment: .leading, spacing: 5) {
             NativeTextEditor(
                 text: $state.inputText,

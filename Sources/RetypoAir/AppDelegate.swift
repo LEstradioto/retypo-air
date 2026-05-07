@@ -153,14 +153,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         if trustedForAccessibility, pressCopyMenuItem(in: sourceApplication) {
             DebugLog.log("copy menu pressed via AX")
-            completeSelectionImportWhenClipboardChanges(
+            completeSelectionImportWhenClipboardChanges(ImportPollContext(
                 originalClipboard: originalClipboard,
                 marker: emptyMarker,
                 markerChangeCount: markerChangeCount,
                 sourceName: sourceName,
                 trustedForAccessibility: trustedForAccessibility,
                 deadline: Date().addingTimeInterval(0.9)
-            )
+            ))
         } else {
             DebugLog.log("copy menu unavailable; not sending synthetic cmd+c to avoid leaking literal c")
             ClipboardService.restore(originalClipboard)
@@ -266,46 +266,41 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return value as? T
     }
 
-    private func completeSelectionImportWhenClipboardChanges(
-        originalClipboard: ClipboardService.Snapshot,
-        marker: String,
-        markerChangeCount: Int,
-        sourceName: String,
-        trustedForAccessibility: Bool,
-        deadline: Date
-    ) {
+    private struct ImportPollContext {
+        let originalClipboard: ClipboardService.Snapshot
+        let marker: String
+        let markerChangeCount: Int
+        let sourceName: String
+        let trustedForAccessibility: Bool
+        let deadline: Date
+    }
+
+    private func completeSelectionImportWhenClipboardChanges(_ ctx: ImportPollContext) {
         let pasteboard = NSPasteboard.general
         let imported = pasteboard.string(forType: .string) ?? ""
         let isMarker = imported.hasPrefix("__RETYP_AIR_IMPORT_EMPTY_")
-        let changed = pasteboard.changeCount != markerChangeCount || !isMarker
-        DebugLog.log("clipboard poll changed=\(changed) changeCount=\(pasteboard.changeCount) markerChangeCount=\(markerChangeCount) importedLen=\(imported.count)")
+        let changed = pasteboard.changeCount != ctx.markerChangeCount || !isMarker
+        DebugLog.log("clipboard poll changed=\(changed) changeCount=\(pasteboard.changeCount) markerChangeCount=\(ctx.markerChangeCount) importedLen=\(imported.count)")
 
-        if !changed, Date() < deadline {
+        if !changed, Date() < ctx.deadline {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
-                self?.completeSelectionImportWhenClipboardChanges(
-                    originalClipboard: originalClipboard,
-                    marker: marker,
-                    markerChangeCount: markerChangeCount,
-                    sourceName: sourceName,
-                    trustedForAccessibility: trustedForAccessibility,
-                    deadline: deadline
-                )
+                self?.completeSelectionImportWhenClipboardChanges(ctx)
             }
             return
         }
 
-        ClipboardService.restore(originalClipboard)
+        ClipboardService.restore(ctx.originalClipboard)
         let text = imported.trimmingCharacters(in: .newlines)
         guard changed, !text.isEmpty, !isMarker else {
             DebugLog.log("import failed: clipboard did not contain selected text")
             showPanel()
-            let permissionHint = trustedForAccessibility ? "" : " Grant Accessibility permission to Retypo Air, then try again."
+            let permissionHint = ctx.trustedForAccessibility ? "" : " Grant Accessibility permission to Retypo Air, then try again."
             state?.status = "No selected text imported.\(permissionHint)"
             return
         }
 
         DebugLog.log("import success via clipboard length=\(imported.count)")
-        let needsConfirmation = state?.receiveExternalImport(imported, source: sourceName) ?? false
+        let needsConfirmation = state?.receiveExternalImport(imported, source: ctx.sourceName) ?? false
         showPanel()
         if needsConfirmation { auxiliaryPanels?.setImportPromptVisible(true) }
     }
