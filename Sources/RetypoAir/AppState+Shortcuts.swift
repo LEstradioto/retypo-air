@@ -34,7 +34,7 @@ extension AppState {
 
     private func matchesPerModelShortcut(_ shortcut: String) -> Bool {
         for provider in ProviderKind.allCases {
-            for model in modelsByProvider[provider] ?? [] {
+            for model in llm.modelsByProvider[provider] ?? [] {
                 let key = settings.modelShortcutKey(provider: provider, modelID: model.id)
                 if ShortcutFormatter.normalize(settings.shortcutByModel[key] ?? "") == shortcut {
                     setSelectedModel(model.id, provider: provider)

@@ -7,13 +7,13 @@ extension SettingsView {
                 .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(.secondary)
             HStack(spacing: 14) {
-                Text("Last \(state.lastCostLabel)")
-                Text("Session \(state.sessionCostLabel)")
-                Text("Today \(state.dayCostLabel)")
-                Text("Tokens \(state.lastCost.usage.totalTokens)")
+                Text("Last \(state.cost.lastCostLabel)")
+                Text("Session \(state.cost.sessionCostLabel)")
+                Text("Today \(state.cost.dayCostLabel)")
+                Text("Tokens \(state.cost.lastCost.usage.totalTokens)")
             }
             .font(.system(size: 12, weight: .semibold, design: .monospaced))
-            let models = state.modelsByProvider[state.selectedProvider] ?? []
+            let models = state.llm.modelsByProvider[state.selectedProvider] ?? []
             if models.isEmpty {
                 Text("Refresh models to edit pricing for this provider.")
                     .foregroundStyle(.secondary)

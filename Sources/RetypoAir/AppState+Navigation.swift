@@ -61,7 +61,7 @@ extension AppState {
     }
 
     private func showCostStatus() {
-        status = "Last \(lastCostLabel) · Session \(sessionCostLabel) · Today \(dayCostLabel)"
+        status = "Last \(cost.lastCostLabel) · Session \(cost.sessionCostLabel) · Today \(cost.dayCostLabel)"
     }
 
     func nextLauncherMode() {
@@ -86,7 +86,7 @@ extension AppState {
         setCurrentAction(action.id)
         await runAction(action, source: "candidate")
         if !diffText.isEmpty {
-            candidateResults = [CandidateResult(action: action, output: outputText, diff: diffText, usage: lastCost.usage, costUSD: lastCost.costUSD)]
+            candidateResults = [CandidateResult(action: action, output: outputText, diff: diffText, usage: cost.lastCost.usage, costUSD: cost.lastCost.costUSD)]
             selectedCandidateIndex = 0
             setCandidateOverlayVisible(true)
         }

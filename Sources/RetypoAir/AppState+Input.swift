@@ -90,16 +90,16 @@ extension AppState {
     }
 
     func refreshModels(for provider: ProviderKind) async {
-        isLoadingModels = true
+        llm.isLoadingModels = true
         status = "Loading \(provider.displayName) models"
         do {
-            let models = try await router.listModels(for: provider)
-            modelsByProvider[provider] = models
+            let models = try await llm.router.listModels(for: provider)
+            llm.modelsByProvider[provider] = models
             mergePricingDefaults(for: provider, models: models)
             status = models.isEmpty ? "No models returned" : "Loaded \(models.count) models"
         } catch {
             status = error.localizedDescription
         }
-        isLoadingModels = false
+        llm.isLoadingModels = false
     }
 }

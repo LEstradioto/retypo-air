@@ -12,18 +12,18 @@ extension SettingsView {
 
                 Picker("Model", selection: Binding(get: { state.selectedModel ?? "" }, set: { if !$0.isEmpty { state.setSelectedModel($0) } })) {
                     Text("Select model...").tag("")
-                    ForEach(state.modelsByProvider[state.selectedProvider] ?? []) { Text($0.id).tag($0.id) }
+                    ForEach(state.llm.modelsByProvider[state.selectedProvider] ?? []) { Text($0.id).tag($0.id) }
                 }
                 .frame(maxWidth: .infinity)
                 .settingsFocus("model.model", radius: 8, keyboardFocusable: true, activate: cycleModel)
 
-                Button(state.isLoadingModels ? "Loading" : "Refresh") { Task { await state.refreshModelsIfPossible() } }
+                Button(state.llm.isLoadingModels ? "Loading" : "Refresh") { Task { await state.refreshModelsIfPossible() } }
                     .buttonStyle(SettingsCapsuleButtonStyle(active: false))
                     .settingsFocus("model.refresh", radius: 14, keyboardFocusable: true, activate: {
                         Task { await state.refreshModelsIfPossible() }
                         return true
                     })
-                    .disabled(state.isLoadingModels)
+                    .disabled(state.llm.isLoadingModels)
             }
             Text("Current: \(state.modelLabel)")
                 .font(.system(size: 11, weight: .medium, design: .monospaced))
@@ -96,7 +96,7 @@ extension SettingsView {
             Text("Global show/hide is fixed for now: cmd+shift+space. Shortcuts below work while the editor is focused.")
                 .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(.secondary)
-            let models = state.modelsByProvider[state.selectedProvider] ?? []
+            let models = state.llm.modelsByProvider[state.selectedProvider] ?? []
             let acceptedCount = state.settings.acceptedModelIDsByProvider[state.selectedProvider]?.count ?? 0
             Text(acceptedCount == 0 ? "Next/previous model browses all loaded models." : "Next/previous model browses only the \(acceptedCount) checked models.")
                 .font(.system(size: 12, weight: .medium, design: .monospaced))

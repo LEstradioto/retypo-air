@@ -82,12 +82,12 @@ struct SettingsView: View {
             "shortcuts.nextModel"
         ])
 
-        for model in (state.modelsByProvider[state.selectedProvider] ?? []).prefix(24) {
+        for model in (state.llm.modelsByProvider[state.selectedProvider] ?? []).prefix(24) {
             ids.append(modelFocusID(model.id, "accepted"))
             ids.append(modelFocusID(model.id, "shortcut"))
         }
 
-        for model in (state.modelsByProvider[state.selectedProvider] ?? []).prefix(12) {
+        for model in (state.llm.modelsByProvider[state.selectedProvider] ?? []).prefix(12) {
             ids.append(modelFocusID(model.id, "pricing.input"))
             ids.append(modelFocusID(model.id, "pricing.output"))
         }
@@ -122,7 +122,7 @@ struct SettingsView: View {
     }
 
     func cycleModel() -> Bool {
-        let models = state.modelsByProvider[state.selectedProvider] ?? []
+        let models = state.llm.modelsByProvider[state.selectedProvider] ?? []
         guard !models.isEmpty else {
             Task { await state.refreshModelsIfPossible() }
             return true

@@ -13,9 +13,6 @@ final class AppState: ObservableObject {
     @Published var status: String = "Ready"
     @Published var diffText: String = ""
     @Published var inlineHighlightRanges: [NSRange] = []
-    @Published var modelsByProvider: [ProviderKind: [ProviderModel]] = [:]
-    @Published var isLoadingModels = false
-    @Published var isCorrecting = false
     @Published var showSettings = false
     @Published var selectedLauncherModeIndex = 0
     @Published var actions: [EditAction]
@@ -32,14 +29,13 @@ final class AppState: ObservableObject {
     @Published var canRedoEditorChange = false
 
     let cost: CostTracker
+    let llm = LLMSession()
 
     weak var host: PanelHost?
 
-    let router = LLMRouter()
     let debouncer = Debouncer()
     let draftHistoryDebouncer = Debouncer()
     var lastAutoSubmittedHash: Int?
-    var correctionGeneration = 0
     var suppressNextInputChange = false
     var typingStartedAt: Date?
     var editor = EditorEngine(limit: 50)
@@ -68,16 +64,13 @@ final class AppState: ObservableObject {
     }
 
     private func rebroadcastCostChanges() {
-        cost.objectWillChange.sink { [weak self] _ in
-            self?.objectWillChange.send()
-        }.store(in: &cancellables)
+        for source in [cost.objectWillChange.eraseToAnyPublisher(), llm.objectWillChange.eraseToAnyPublisher()] {
+            source.sink { [weak self] _ in
+                self?.objectWillChange.send()
+            }.store(in: &cancellables)
+        }
     }
 
-    // Forwarding to CostTracker so views observing AppState don't need to change.
-    var lastCost: CostSnapshot { cost.lastCost }
-    var lastCostLabel: String { cost.lastCostLabel }
-    var sessionCostLabel: String { cost.sessionCostLabel }
-    var dayCostLabel: String { cost.dayCostLabel }
 
     var selectedProvider: ProviderKind {
         get { settings.provider }
@@ -106,7 +99,7 @@ final class AppState: ObservableObject {
     }
 
     var navigableModels: [ProviderModel] {
-        let models = modelsByProvider[settings.provider] ?? []
+        let models = llm.modelsByProvider[settings.provider] ?? []
         let accepted = Set(settings.acceptedModelIDsByProvider[settings.provider] ?? [])
         guard !accepted.isEmpty else { return models }
         return models.filter { accepted.contains($0.id) }
@@ -137,7 +130,7 @@ final class AppState: ObservableObject {
 
     func toggleCandidateOverlay() {
         if candidateResults.isEmpty, !diffText.isEmpty {
-            candidateResults = [CandidateResult(action: currentAction, output: outputText, diff: diffText, usage: lastCost.usage, costUSD: lastCost.costUSD)]
+            candidateResults = [CandidateResult(action: currentAction, output: outputText, diff: diffText, usage: cost.lastCost.usage, costUSD: cost.lastCost.costUSD)]
             selectedCandidateIndex = 0
         }
         setCandidateOverlayVisible(!showCandidateOverlay)

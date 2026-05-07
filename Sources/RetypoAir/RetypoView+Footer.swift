@@ -16,7 +16,7 @@ extension RetypoView {
             .overlay(Capsule(style: .continuous).strokeBorder(state.footerFocusIndex == 0 ? Color.accentColor.opacity(0.42) : Color.clear, lineWidth: 1))
 
             Menu {
-                let models = state.navigableModels.isEmpty ? (state.modelsByProvider[state.selectedProvider] ?? []) : state.navigableModels
+                let models = state.navigableModels.isEmpty ? (state.llm.modelsByProvider[state.selectedProvider] ?? []) : state.navigableModels
                 if models.isEmpty {
                     Button("Refresh models") { Task { await state.refreshModelsIfPossible() } }
                 } else {
@@ -56,7 +56,7 @@ extension RetypoView {
             .pointingCursor()
 
             Spacer(minLength: 6)
-            if state.isCorrecting { ProgressView().controlSize(.small) }
+            if state.llm.isCorrecting { ProgressView().controlSize(.small) }
             Button { state.undoEditorChange() } label: {
                 footerIcon("arrow.uturn.backward", active: state.canUndoEditorChange, focused: state.footerFocusIndex == 5)
             }
@@ -79,11 +79,11 @@ extension RetypoView {
             .buttonStyle(.plain)
 
             Menu {
-                Text("Last: \(state.lastCostLabel) · \(state.lastCost.usage.totalTokens)t")
-                Text("Session: \(state.sessionCostLabel)")
-                Text("Today: \(state.dayCostLabel)")
+                Text("Last: \(state.cost.lastCostLabel) · \(state.cost.lastCost.usage.totalTokens)t")
+                Text("Session: \(state.cost.sessionCostLabel)")
+                Text("Today: \(state.cost.dayCostLabel)")
             } label: {
-                footerLink("Last \(state.lastCostLabel)", active: state.lastCost.costUSD != nil, focused: state.footerFocusIndex == 8, maxWidth: 92)
+                footerLink("Last \(state.cost.lastCostLabel)", active: state.cost.lastCost.costUSD != nil, focused: state.footerFocusIndex == 8, maxWidth: 92)
             }
             .menuStyle(.borderlessButton)
             Text("\(Int(state.wordsPerMinute))wpm")
