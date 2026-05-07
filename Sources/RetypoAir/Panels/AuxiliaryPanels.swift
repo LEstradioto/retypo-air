@@ -9,6 +9,7 @@ final class AuxiliaryPanelController {
     var settingsPanel: NSPanel?
     var candidatesPanel: NSPanel?
     var importPromptPanel: NSPanel?
+    var freeformPromptPanel: NSPanel?
 
     init(mainPanel: NSWindow, state: AppState) {
         self.mainPanel = mainPanel
@@ -32,6 +33,7 @@ final class AuxiliaryPanelController {
         candidatesPanel?.orderOut(nil)
         state?.showCandidateOverlay = false
         importPromptPanel?.orderOut(nil)
+        freeformPromptPanel?.orderOut(nil)
     }
 
     func makePanel(width: CGFloat, height: CGFloat, minWidth: CGFloat, minHeight: CGFloat) -> KeyableAuxiliaryPanel {

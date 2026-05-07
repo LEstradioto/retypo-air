@@ -41,6 +41,10 @@ final class AppState: ObservableObject {
     var lastAutoSubmittedHash: Int?
     var suppressNextInputChange = false
     var typingStartedAt: Date?
+    /// Last time `updateTypingStats` saw a change. Used to detect long pauses
+    /// and reset the WPM session so the number doesn't keep falling while you
+    /// step away from the keyboard.
+    var lastTypingUpdate: Date?
     var editor = EditorEngine(limit: 50)
     private var cancellables = Set<AnyCancellable>()
 
@@ -123,7 +127,6 @@ final class AppState: ObservableObject {
     func setCurrentAction(_ actionID: String) {
         guard enabledActions.contains(where: { $0.id == actionID }) || actions.contains(where: { $0.id == actionID }) else { return }
         settings.currentActionID = actionID
-        status = "Mode: \(currentAction.title)"
         saveSettings()
     }
 

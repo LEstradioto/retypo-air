@@ -8,12 +8,14 @@ final class MockPanelHost: PanelHost {
     var alwaysOnTop: Bool?
     var candidatesVisibilityHistory: [Bool] = []
     var importConfirmationHistory: [Bool] = []
+    var freeformPromptHistory: [Bool] = []
 
     func setAlwaysOnTop(_ enabled: Bool) { alwaysOnTop = enabled }
     func requestHide() { hideRequestCount += 1 }
     func requestSettings() { settingsRequestCount += 1 }
     func setCandidatesVisible(_ visible: Bool) { candidatesVisibilityHistory.append(visible) }
     func setImportConfirmationVisible(_ visible: Bool) { importConfirmationHistory.append(visible) }
+    func setFreeformPromptVisible(_ visible: Bool) { freeformPromptHistory.append(visible) }
 }
 
 @MainActor

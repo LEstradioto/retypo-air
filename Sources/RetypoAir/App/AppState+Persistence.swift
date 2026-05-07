@@ -46,12 +46,27 @@ extension AppState {
         DraftSnapshotStore.save(draftSnapshots)
     }
 
+    /// Monkeytype-style WPM: hide for the first ~5s warm-up window, reset
+    /// the session if the user paused longer than 15s, otherwise the simple
+    /// `words / elapsed_minutes` average since session start.
     func updateTypingStats() {
-        let words = countWords(inputText)
+        let now = Date()
+        if let last = lastTypingUpdate, now.timeIntervalSince(last) > Self.typingPauseResetSeconds {
+            typingStartedAt = now
+        }
+        if typingStartedAt == nil { typingStartedAt = now }
+        lastTypingUpdate = now
         guard let started = typingStartedAt else { return }
-        let minutes = max(Date().timeIntervalSince(started) / 60, 0.05)
-        wordsPerMinute = Double(words) / minutes
+        let elapsed = now.timeIntervalSince(started)
+        if elapsed < Self.typingWarmupSeconds {
+            wordsPerMinute = 0
+            return
+        }
+        wordsPerMinute = Double(countWords(inputText)) / (elapsed / 60)
     }
+
+    static let typingWarmupSeconds: TimeInterval = 5
+    static let typingPauseResetSeconds: TimeInterval = 15
 
     func countWords(_ text: String) -> Int {
         let ns = text as NSString

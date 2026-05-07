@@ -41,6 +41,18 @@ extension AppState {
             await correctAndMaybeCopy(source: source)
             return
         }
+        if action.id == EditAction.freeformID {
+            // Freeform always routes through the prompt panel — let the user
+            // type/edit the instruction before the request fires.
+            host?.setFreeformPromptVisible(true)
+            return
+        }
+        await performEditAction(action, source: source)
+    }
+
+    /// The inner runner used by `runAction` (for non-freeform actions) and by
+    /// `confirmFreeformPrompt` (after the user has typed an instruction).
+    func performEditAction(_ action: EditAction, source: String) async {
         guard let instruction = resolvedInstruction(for: action) else {
             status = "Type a Freeform instruction first"
             return
@@ -56,6 +68,16 @@ extension AppState {
             status = error.localizedDescription
         }
         llm.isCorrecting = false
+    }
+
+    func confirmFreeformPrompt() {
+        host?.setFreeformPromptVisible(false)
+        let action = currentAction
+        Task { await performEditAction(action, source: "freeform") }
+    }
+
+    func cancelFreeformPrompt() {
+        host?.setFreeformPromptVisible(false)
     }
 
     /// Resolve the system instruction for an action, returning nil when the

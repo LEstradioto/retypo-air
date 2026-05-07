@@ -32,15 +32,17 @@ extension AppState {
         Self.footerActions[index](self)
     }
 
+    /// Order matches the visual layout in `RetypoView+Footer`: mode,
+    /// candidates icon, model, layout, auto, settings, undo, redo, cost.
     private static let footerActions: [(AppState) -> Void] = [
         { $0.activateModeCycle() },
+        { $0.toggleCandidateOverlay() },
         { $0.selectAdjacentModel(direction: 1) },
         { $0.toggleEditorLayout() },
         { $0.toggleAutoCorrect() },
         { $0.requestSettings() },
         { _ = $0.undoEditorChange() },
         { _ = $0.redoEditorChange() },
-        { $0.toggleCandidateOverlay() },
         { $0.showCostStatus() }
     ]
 
@@ -76,7 +78,6 @@ extension AppState {
         guard !enabledActions.isEmpty else { return }
         selectedLauncherModeIndex = (selectedLauncherModeIndex + direction + enabledActions.count) % enabledActions.count
         settings.currentActionID = enabledActions[selectedLauncherModeIndex].id
-        status = "Mode: \(currentAction.title)"
         saveSettings()
     }
 

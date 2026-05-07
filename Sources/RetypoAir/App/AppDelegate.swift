@@ -142,6 +142,9 @@ extension AppDelegate: PanelHost {
     func setImportConfirmationVisible(_ visible: Bool) {
         auxiliaryPanels?.setImportPromptVisible(visible)
     }
+    func setFreeformPromptVisible(_ visible: Bool) {
+        auxiliaryPanels?.setFreeformPromptVisible(visible)
+    }
     // requestHide is provided by hidePanelAndFocusPrevious below; this satisfies the protocol.
 }
 

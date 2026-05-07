@@ -12,4 +12,5 @@ protocol PanelHost: AnyObject {
     func requestSettings()
     func setCandidatesVisible(_ visible: Bool)
     func setImportConfirmationVisible(_ visible: Bool)
+    func setFreeformPromptVisible(_ visible: Bool)
 }
