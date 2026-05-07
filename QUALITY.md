@@ -56,6 +56,36 @@ copy in `.githooks/pre-push`) runs `bin/quality` automatically.
 - Coverage is intentionally low (2.67%) — only pure-logic modules are tested.
   Next: integration tests on AppState slices.
 
+**Round 4 wins (architectural deepenings, applying the
+[improve-codebase-architecture skill](https://github.com/mattpocock/skills/blob/main/skills/engineering/improve-codebase-architecture/SKILL.md)):**
+
+5 deep modules carved out of AppState + the persistence layer:
+
+| Module | Replaced | Why deeper |
+|---|---|---|
+| `PersistedFile<T: Codable>` | 7 ad-hoc `*Store` enums | One JSON-IO module, one error path, one place to fix bugs |
+| `PanelHost` | 6 stored callback closures on AppState | Single named seam; `MockPanelHost` enables AppState tests |
+| `EditorEngine` (value type) | undo/redo + transitions buried in `@MainActor` AppState | Pure logic, no scaffold to test, mutation-testable |
+| `CostTracker` | 5 `@Published` cost props + 8 methods on AppState | Cost concerns isolated; views observe cost directly |
+| `LLMSession` | isCorrecting/isLoadingModels/modelsByProvider/router/generation on AppState | Live-call concerns isolated |
+| `URL(staticString:)` | 5 `URL(string: ...)!` force-unwraps | Trap-on-malformed; can't ship a typo |
+
+`AppState` went from a god-class (30+ properties, 6 callbacks, mixed
+concerns) to a composition root with 4 explicit sub-stores (`cost`,
+`llm`, `editor`, `host`). Each consumer learns a smaller interface.
+
+**Tests added in round 4**: 30 (was 53, now **82**). EditorEngine has
+14 pure-value tests; PanelHost has 8 behavior tests. Coverage 3% →
+7.68% — the jump comes from finally being able to drive AppState
+without launching AppKit.
+
+**Phase 6 metric end-state still distant** — `type_body_length` 7 and
+file_length 4 are floors imposed by SwiftUI/AppKit verbosity and the
+SettingsView/CandidateWindowView/RetypoView struct shapes. Reaching 2
+would require either splitting those views into standalone subviews or
+extracting Editor state from AppState (both invasive across SwiftUI
+bindings).
+
 The numbers above are *current violation counts*. The gate passes if a PR does
 not increase any count. Use `bin/quality-bump` to commit a new lower baseline
 after improvements. SwiftLint per-rule thresholds are in `.swiftlint.yml`.
