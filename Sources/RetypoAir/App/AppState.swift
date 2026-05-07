@@ -140,10 +140,10 @@ final class AppState: ObservableObject {
     }
 
     func toggleCandidateOverlay() {
-        if candidateResults.isEmpty, !diffText.isEmpty {
-            candidateResults = [CandidateResult(action: currentAction, output: outputText, diff: diffText, usage: cost.lastCost.usage, costUSD: cost.lastCost.costUSD)]
-            selectedCandidateIndex = 0
-        }
+        // Always open in launcher mode (mode picker). Multi-candidate flows
+        // (run-all-modes) populate `candidateResults` themselves; we used to
+        // auto-wrap the leftover diff into a single fake card, but that
+        // showed stale state and blocked re-entry to Freeform.
         setCandidateOverlayVisible(!showCandidateOverlay)
     }
 

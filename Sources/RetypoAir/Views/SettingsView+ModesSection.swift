@@ -28,15 +28,11 @@ extension SettingsView {
     }
 
     private func modeRow(_ action: EditAction) -> some View {
-        let isFreeform = action.id == EditAction.freeformID
-        return VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 10) {
                 modeEnabledToggle(action)
                 modeSelectButton(action)
-                Text(isFreeform ? "Type the instruction at run-time (popup on Enter)" : action.instruction)
-                    .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
+                Text(action.instruction).font(.system(size: 12)).foregroundStyle(.secondary).lineLimit(1)
                 Spacer()
                 Text(state.settings.shortcutByAction[action.id] ?? "")
                     .font(.system(size: 11, weight: .medium, design: .monospaced))
@@ -47,14 +43,7 @@ extension SettingsView {
             if editingModeID == action.id { modeEditor(action) }
         }
         .padding(10)
-        .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(
-            isFreeform ? Color.accentColor.opacity(0.13) : Color.black.opacity(0.045)
-        ))
-        .overlay(
-            isFreeform
-                ? RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(Color.accentColor.opacity(0.30), lineWidth: 1)
-                : nil
-        )
+        .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Color.black.opacity(0.045)))
     }
 
     private func modeEnabledToggle(_ action: EditAction) -> some View {
@@ -68,20 +57,13 @@ extension SettingsView {
     }
 
     private func modeSelectButton(_ action: EditAction) -> some View {
-        Button { state.setCurrentAction(action.id) } label: {
-            HStack(spacing: 4) {
-                if action.id == EditAction.freeformID {
-                    Image(systemName: "sparkles").font(.system(size: 9, weight: .semibold))
-                }
-                Text(action.title)
-            }
-        }
-        .buttonStyle(SettingsCapsuleButtonStyle(active: state.currentAction.id == action.id))
-        .settingsFocus(modeFocusID(action.id, "select"), radius: 12, keyboardFocusable: true, activate: {
-            state.setCurrentAction(action.id)
-            return true
-        })
-        .frame(width: 110, alignment: .leading)
+        Button(action.title) { state.setCurrentAction(action.id) }
+            .buttonStyle(SettingsCapsuleButtonStyle(active: state.currentAction.id == action.id))
+            .settingsFocus(modeFocusID(action.id, "select"), radius: 12, keyboardFocusable: true, activate: {
+                state.setCurrentAction(action.id)
+                return true
+            })
+            .frame(width: 110, alignment: .leading)
     }
 
     private func modeEditButton(_ action: EditAction) -> some View {

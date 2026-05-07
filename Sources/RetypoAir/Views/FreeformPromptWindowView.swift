@@ -20,15 +20,13 @@ struct FreeformPromptWindowView: View {
         }
         .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(Color.accentColor.opacity(0.24), lineWidth: 1))
-        .onAppear { focusField() }
-        .onChange(of: state.freeformPromptShowID) { _ in focusField() }
-    }
-
-    private func focusField() {
-        // Two ticks: NSPanel needs to settle before SwiftUI focus takes.
-        DispatchQueue.main.async {
+        .task(id: state.freeformPromptShowID) {
+            // Wait for the NSPanel to actually become key + the SwiftUI host
+            // to settle, then claim focus. Without the sleep, @FocusState
+            // doesn't reliably fire on the second-and-later shows of the
+            // same panel.
+            try? await Task.sleep(nanoseconds: 120_000_000)
             fieldFocused = true
-            DispatchQueue.main.async { fieldFocused = true }
         }
     }
 

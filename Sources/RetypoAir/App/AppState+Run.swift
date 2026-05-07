@@ -77,7 +77,15 @@ extension AppState {
     func confirmFreeformPrompt() {
         host?.setFreeformPromptVisible(false)
         let action = currentAction
-        Task { await performEditAction(action, source: "freeform") }
+        Task {
+            await performEditAction(action, source: "freeform")
+            // After Freeform finishes, drop the candidates panel + cards so
+            // the next Cmd+D opens fresh in launcher mode. The result still
+            // lives in the main editor's output.
+            candidateResults = []
+            selectedCandidateIndex = 0
+            host?.setCandidatesVisible(false)
+        }
     }
 
     func cancelFreeformPrompt() {

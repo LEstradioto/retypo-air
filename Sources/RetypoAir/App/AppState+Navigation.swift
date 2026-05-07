@@ -86,6 +86,9 @@ extension AppState {
         let action = enabledActions[selectedLauncherModeIndex]
         setCurrentAction(action.id)
         await runAction(action, source: "candidate")
+        // Freeform routes through its own modal flow — don't try to wrap
+        // any leftover diff here, that's stale state from a previous run.
+        if action.id == EditAction.freeformID { return }
         if !diffText.isEmpty {
             candidateResults = [CandidateResult(action: action, output: outputText, diff: diffText, usage: cost.lastCost.usage, costUSD: cost.lastCost.costUSD)]
             selectedCandidateIndex = 0
