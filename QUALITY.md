@@ -34,6 +34,7 @@ copy in `.githooks/pre-push`) runs `bin/quality` automatically.
 | 2026-05-06 (initial) | 5 | — | 4 | 10 | 36 | 10 | 8 | 29 | 0% |
 | 2026-05-06 (cleanup) | **0** | **0** | **0** | 9 | 35 | 13 ↑ | 8 | **4** | 0% |
 | 2026-05-06 (split) | **0** | **0** | **0** | **7** | **34** | **7** | 8 | **4** | **2.67%** |
+| 2026-05-06 (round 3) | **0** | **0** | **0** | **4** | **26** | **5** | **7** | **4** | **3.04%** |
 
 **Round 2 wins:**
 - `cyclomatic` 10 → 7 (refactored `keyDown` 18→8, `handlePanelShortcut` 14→7,

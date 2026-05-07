@@ -28,4 +28,16 @@ final class CorrectionPolicyTests: XCTestCase {
     func testHighSymbolDensitySkipped() {
         XCTAssertFalse(CorrectionPolicy.shouldAutoCorrect("(((!!!@@@###))) %%%%% &&&&&"))
     }
+
+    func testWhitespaceOnlyTooShort() {
+        XCTAssertFalse(CorrectionPolicy.shouldAutoCorrect("        "))
+    }
+
+    func testExactlyEightCharsAccepted() {
+        XCTAssertTrue(CorrectionPolicy.shouldAutoCorrect("12345678"))
+    }
+
+    func testCommandPrefixDoesNotTriggerOnPlainProse() {
+        XCTAssertFalse(CorrectionPolicy.looksLikeShellCommand("Cycling through git history is useful."))
+    }
 }

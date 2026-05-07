@@ -35,4 +35,24 @@ final class InlineDiffServiceTests: XCTestCase {
         )
         XCTAssertEqual(count, 2)
     }
+
+    func testRangesProduceValidNSRanges() {
+        let ranges = InlineDiffService.changedRanges(
+            original: "alpha bravo charlie",
+            corrected: "alpha BRAVO charlie"
+        )
+        let nsString = "alpha BRAVO charlie" as NSString
+        for range in ranges {
+            XCTAssertGreaterThanOrEqual(range.location, 0)
+            XCTAssertLessThanOrEqual(NSMaxRange(range), nsString.length)
+        }
+    }
+
+    func testTrailingPunctuationIgnored() {
+        let count = InlineDiffService.changedWordCount(
+            original: "hello world",
+            corrected: "hello world!"
+        )
+        XCTAssertEqual(count, 0)
+    }
 }
