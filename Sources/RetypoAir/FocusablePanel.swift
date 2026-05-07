@@ -26,40 +26,29 @@ final class KeyableAuxiliaryPanel: NSPanel {
     }
 
     private func handlePanelShortcut(_ event: NSEvent) -> Bool {
-        if event.keyCode == 48 { // tab
-            if event.modifierFlags.contains(.shift) {
-                guard let onShiftTabKey else { return false }
-                onShiftTabKey()
-            } else {
-                guard let onTabKey else { return false }
-                onTabKey()
-            }
-            return true
+        let mods = event.modifierFlags
+        switch Int(event.keyCode) {
+        case 48: return invokeTabHandler(shift: mods.contains(.shift))                          // tab
+        case 13 where mods.contains(.control): return invoke(onCloseKey)                         // ctrl+w
+        case 1 where mods.contains(.command): return invoke(onCommandSKey)                       // cmd+s
+        case 2 where mods.contains(.command) || mods.contains(.control):
+            return invoke(onToggleCandidatesKey)                                                  // cmd/ctrl+d
+        case 36, 76: return onEnterKey?() ?? false                                               // enter
+        case 53: return invoke(onCloseKey)                                                       // esc
+        default: return false
         }
-        if event.keyCode == 13, event.modifierFlags.contains(.control) { // Ctrl+W
-            guard let onCloseKey else { return false }
-            onCloseKey()
-            return true
-        }
-        if event.keyCode == 1, event.modifierFlags.contains(.command) { // Cmd+S
-            guard let onCommandSKey else { return false }
-            onCommandSKey()
-            return true
-        }
-        if event.keyCode == 2, event.modifierFlags.contains(.command) || event.modifierFlags.contains(.control) { // Cmd/Ctrl+D
-            guard let onToggleCandidatesKey else { return false }
-            onToggleCandidatesKey()
-            return true
-        }
-        if event.keyCode == 36 || event.keyCode == 76 { // enter
-            guard let onEnterKey else { return false }
-            return onEnterKey()
-        }
-        if event.keyCode == 53 { // escape
-            guard let onCloseKey else { return false }
-            onCloseKey()
-            return true
-        }
-        return false
+    }
+
+    private func invokeTabHandler(shift: Bool) -> Bool {
+        let handler = shift ? onShiftTabKey : onTabKey
+        guard let handler else { return false }
+        handler()
+        return true
+    }
+
+    private func invoke(_ handler: (() -> Void)?) -> Bool {
+        guard let handler else { return false }
+        handler()
+        return true
     }
 }

@@ -2,21 +2,25 @@
   "_comment": "Ratcheted baseline \u2014 see .claude/skills/apply-quality-gates/SKILL.md. Lower numbers via `bin/quality-bump`. Any PR that grows a count fails `bin/quality`.",
   "_captured_at": "2026-05-06",
   "swiftlint": {
-    "cyclomatic_complexity": 9,
-    "function_body_length": 35,
+    "cyclomatic_complexity": 7,
+    "function_body_length": 34,
     "type_body_length": 8,
-    "file_length": 13,
+    "file_length": 7,
     "function_parameter_count": 0,
     "force_unwrapping": 0,
-    "total_warnings": 72
+    "force_cast": 0,
+    "force_try": 0,
+    "total_warnings": 63
   },
   "periphery": {
     "unused_declarations": 4
   },
+  "coverage": {
+    "line_coverage_percent_min": 2.67
+  },
   "_skipped": {
-    "coverage": "no test target yet",
     "branch_coverage": "Apple platforms expose only line coverage natively",
-    "mutation_kill_ratio": "blocked on test target",
+    "mutation_kill_ratio": "Muter pending \u2014 defer until coverage reaches a meaningful floor",
     "dependency_structure": "single SPM target \u2014 architecture-theatre at this size"
   }
 }

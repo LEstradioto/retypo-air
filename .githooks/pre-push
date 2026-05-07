@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# Quality gate — runs swiftlint, periphery, and tests with coverage.
+# Skip with: git push --no-verify (avoid).
+exec ./bin/quality

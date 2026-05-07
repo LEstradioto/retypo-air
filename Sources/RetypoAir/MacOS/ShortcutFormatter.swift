@@ -36,19 +36,15 @@ enum ShortcutFormatter {
         return (mods + [key]).filter { !$0.isEmpty }.joined(separator: "+")
     }
 
+    private static let keyNamesByCode: [Int: String] = [
+        36: "enter", 76: "enter",
+        49: "space", 53: "esc",
+        115: "home", 119: "end",
+        123: "left", 124: "right", 125: "down", 126: "up"
+    ]
+
     private static func keyName(from event: NSEvent) -> String? {
-        switch Int(event.keyCode) {
-        case 36, 76: return "enter"
-        case 49: return "space"
-        case 53: return "esc"
-        case 115: return "home"
-        case 119: return "end"
-        case 123: return "left"
-        case 124: return "right"
-        case 125: return "down"
-        case 126: return "up"
-        default:
-            return event.charactersIgnoringModifiers?.lowercased()
-        }
+        if let name = keyNamesByCode[Int(event.keyCode)] { return name }
+        return event.charactersIgnoringModifiers?.lowercased()
     }
 }

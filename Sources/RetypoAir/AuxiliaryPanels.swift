@@ -83,8 +83,12 @@ final class AuxiliaryPanelController {
                 }
                 return true
             }
-            panel.onCloseKey = { [weak self] in
-                self?.hideCandidates(focusMain: true)
+            panel.onCloseKey = { [weak self, weak state] in
+                if let state, !state.candidateResults.isEmpty {
+                    state.clearCandidateResults()
+                } else {
+                    self?.hideCandidates(focusMain: true)
+                }
             }
             panel.onToggleCandidatesKey = { [weak self] in
                 self?.hideCandidates(focusMain: true)

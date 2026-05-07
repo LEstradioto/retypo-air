@@ -28,34 +28,40 @@ extension AppState {
     }
 
     func activateFooterFocus() {
-        guard let index = footerFocusIndex else { return }
-        switch index {
-        case 0:
-            if let currentIndex = enabledActions.firstIndex(where: { $0.id == currentAction.id }) {
-                let next = enabledActions[(currentIndex + 1) % enabledActions.count]
-                setCurrentAction(next.id)
-            }
-        case 1:
-            selectAdjacentModel(direction: 1)
-        case 2:
-            settings.editorLayout = settings.editorLayout == .stacked ? .inline : .stacked
-            saveSettings()
-        case 3:
-            settings.autoCorrect.toggle()
-            saveSettings()
-        case 4:
-            requestSettings()
-        case 5:
-            _ = undoEditorChange()
-        case 6:
-            _ = redoEditorChange()
-        case 7:
-            toggleCandidateOverlay()
-        case 8:
-            status = "Last \(lastCostLabel) · Session \(sessionCostLabel) · Today \(dayCostLabel)"
-        default:
-            break
-        }
+        guard let index = footerFocusIndex, Self.footerActions.indices.contains(index) else { return }
+        Self.footerActions[index](self)
+    }
+
+    private static let footerActions: [(AppState) -> Void] = [
+        { $0.activateModeCycle() },
+        { $0.selectAdjacentModel(direction: 1) },
+        { $0.toggleEditorLayout() },
+        { $0.toggleAutoCorrect() },
+        { $0.requestSettings() },
+        { _ = $0.undoEditorChange() },
+        { _ = $0.redoEditorChange() },
+        { $0.toggleCandidateOverlay() },
+        { $0.showCostStatus() }
+    ]
+
+    private func activateModeCycle() {
+        guard let currentIndex = enabledActions.firstIndex(where: { $0.id == currentAction.id }) else { return }
+        let next = enabledActions[(currentIndex + 1) % enabledActions.count]
+        setCurrentAction(next.id)
+    }
+
+    private func toggleEditorLayout() {
+        settings.editorLayout = settings.editorLayout == .stacked ? .inline : .stacked
+        saveSettings()
+    }
+
+    private func toggleAutoCorrect() {
+        settings.autoCorrect.toggle()
+        saveSettings()
+    }
+
+    private func showCostStatus() {
+        status = "Last \(lastCostLabel) · Session \(sessionCostLabel) · Today \(dayCostLabel)"
     }
 
     func nextLauncherMode() {
@@ -108,6 +114,11 @@ extension AppState {
         diffText = candidate.diff
         ClipboardService.copy(candidate.output)
         status = "Selected \(candidate.action.title)"
+    }
+
+    func clearCandidateResults() {
+        candidateResults = []
+        selectedCandidateIndex = 0
     }
 
     func restoreSelectedCandidateToEditor() {

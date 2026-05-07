@@ -32,8 +32,8 @@ type_body_length:
   error: 100
 
 file_length:
-  warning: 100
-  error: 200               # generated/declarative files get a soft ceiling at 200
+  warning: 150              # Swift idioms (imports, decls, SwiftUI bodies) need more room than Ruby
+  error: 200                # hard ceiling: split the file
 
 function_parameter_count:
   warning: 4
@@ -50,5 +50,10 @@ opt_in_rules:
   - redundant_nil_coalescing
   - sorted_first_last
   - toggle_bool
+  - unused_optional_binding
+  - redundant_optional_initialization
+  - prohibited_super_call
+
+# force_cast / force_try are SwiftLint defaults; tracked explicitly in the gate.
 
 reporter: "xcode"
