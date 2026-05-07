@@ -5,11 +5,11 @@ import SwiftUI
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
-    private var panel: FloatingPanel?
-    private var state: AppState?
-    private var hotkeys: HotkeyService?
-    private var auxiliaryPanels: AuxiliaryPanelController?
-    private var previousApplication: NSRunningApplication?
+    var panel: FloatingPanel?
+    var state: AppState?
+    var hotkeys: HotkeyService?
+    var auxiliaryPanels: AuxiliaryPanelController?
+    var previousApplication: NSRunningApplication?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         configureApplicationMenu()
@@ -29,25 +29,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let auxiliaryPanels = AuxiliaryPanelController(mainPanel: panel, state: appState)
         self.auxiliaryPanels = auxiliaryPanels
 
+        wireStateCallbacks(appState, panel: panel)
+        registerHotkeys()
+
+        showPanel()
+        Task { await appState.refreshModelsIfPossible() }
+    }
+
+    private func wireStateCallbacks(_ appState: AppState, panel: FloatingPanel) {
         appState.onAlwaysOnTopChanged = { [weak panel] enabled in
             panel?.level = enabled ? .floating : .normal
         }
-        appState.onHideRequested = { [weak self] in
-            self?.hidePanelAndFocusPrevious()
-        }
-        appState.onShowRequested = { [weak self] in
-            self?.showPanel()
-        }
-        appState.onSettingsRequested = { [weak self] in
-            self?.auxiliaryPanels?.toggleSettings()
-        }
+        appState.onHideRequested = { [weak self] in self?.hidePanelAndFocusPrevious() }
+        appState.onShowRequested = { [weak self] in self?.showPanel() }
+        appState.onSettingsRequested = { [weak self] in self?.auxiliaryPanels?.toggleSettings() }
         appState.onCandidatesVisibilityChanged = { [weak self] visible in
             self?.auxiliaryPanels?.setCandidatesVisible(visible)
         }
         appState.onImportConfirmationChanged = { [weak self] visible in
             self?.auxiliaryPanels?.setImportPromptVisible(visible)
         }
+    }
 
+    private func registerHotkeys() {
         hotkeys = HotkeyService { [weak self] action in
             switch action {
             case .togglePanel:
@@ -57,9 +61,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
         hotkeys?.register()
-
-        showPanel()
-        Task { await appState.refreshModelsIfPossible() }
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
@@ -72,7 +73,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         focusEditorIfPossible()
     }
 
-    private func showPanel() {
+    func showPanel() {
         rememberPreviousApplication()
         guard let panel else { return }
         positionPanelForActiveScreenIfNeeded()
@@ -83,7 +84,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    private func hidePanelAndFocusPrevious() {
+    func hidePanelAndFocusPrevious() {
         panel?.orderOut(nil)
         if let previousApplication, !previousApplication.isTerminated {
             previousApplication.activate(options: [.activateIgnoringOtherApps])
@@ -103,208 +104,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    private func importSelectedTextFromFrontmostApp(allowClipboardFallback: Bool) {
-        DebugLog.log("import begin nsAppActive=\(NSApp.isActive)")
-        if NSApp.isActive {
-            DebugLog.log("import skipped because Retypo is active; running all modes")
-            Task { [weak state] in
-                await state?.runAllEnabledModes()
-            }
-            return
-        }
-
-        guard let sourceApplication = NSWorkspace.shared.frontmostApplication,
-              sourceApplication.processIdentifier != NSRunningApplication.current.processIdentifier else {
-            DebugLog.log("import failed: no external frontmost app. frontmost=\(NSWorkspace.shared.frontmostApplication?.localizedName ?? "nil")")
-            showPanel()
-            state?.status = "No external app focused"
-            return
-        }
-
-        previousApplication = sourceApplication
-        let sourceName = sourceApplication.localizedName ?? "frontmost app"
-        DebugLog.log("import source name=\(sourceName) bundle=\(sourceApplication.bundleIdentifier ?? "nil") pid=\(sourceApplication.processIdentifier)")
-        let trustedForAccessibility = requestAccessibilityTrustIfNeeded()
-        DebugLog.log("accessibility trusted=\(trustedForAccessibility)")
-
-        if trustedForAccessibility,
-           let selectedText = selectedTextViaAccessibility(from: sourceApplication),
-           !selectedText.trimmingCharacters(in: .newlines).isEmpty {
-            DebugLog.log("import success via AXSelectedText length=\(selectedText.count)")
-            let needsConfirmation = state?.receiveExternalImport(selectedText, source: sourceName) ?? false
-            showPanel()
-            if needsConfirmation { auxiliaryPanels?.setImportPromptVisible(true) }
-            return
-        }
-
-        guard allowClipboardFallback else {
-            DebugLog.log("fast import found no AXSelectedText; opening panel without clipboard fallback")
-            showPanel()
-            state?.status = "No selected text imported"
-            return
-        }
-
-        let originalClipboard = ClipboardService.snapshot()
-        let pasteboard = NSPasteboard.general
-        let emptyMarker = "__RETYP_AIR_IMPORT_EMPTY_\(UUID().uuidString)__"
-        pasteboard.clearContents()
-        pasteboard.setString(emptyMarker, forType: .string)
-        let markerChangeCount = pasteboard.changeCount
-
-        if trustedForAccessibility, pressCopyMenuItem(in: sourceApplication) {
-            DebugLog.log("copy menu pressed via AX")
-            completeSelectionImportWhenClipboardChanges(ImportPollContext(
-                originalClipboard: originalClipboard,
-                marker: emptyMarker,
-                markerChangeCount: markerChangeCount,
-                sourceName: sourceName,
-                trustedForAccessibility: trustedForAccessibility,
-                deadline: Date().addingTimeInterval(0.9)
-            ))
-        } else {
-            DebugLog.log("copy menu unavailable; not sending synthetic cmd+c to avoid leaking literal c")
-            ClipboardService.restore(originalClipboard)
-            showPanel()
-            state?.status = trustedForAccessibility ? "No selected text imported" : "Grant Accessibility permission to import selection"
-        }
-    }
-
-    private func rememberPreviousApplication() {
-        let current = NSWorkspace.shared.frontmostApplication
-        if current?.processIdentifier != NSRunningApplication.current.processIdentifier {
-            previousApplication = current
-        }
-    }
-
-    private func requestAccessibilityTrustIfNeeded() -> Bool {
-        let before = AXIsProcessTrusted()
-        DebugLog.log("accessibility trusted before prompt=\(before)")
-        if before { return true }
-        let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
-        let after = AXIsProcessTrustedWithOptions(options)
-        DebugLog.log("accessibility trusted after prompt call=\(after)")
-        return after
-    }
-
-    private func selectedTextViaAccessibility(from application: NSRunningApplication) -> String? {
-        let appElement = AXUIElementCreateApplication(application.processIdentifier)
-        guard let focused = axAttribute(appElement, kAXFocusedUIElementAttribute) as AXUIElement? else {
-            DebugLog.log("AXSelectedText failed: no focused UI element")
-            return nil
-        }
-        if let selected = axAttribute(focused, kAXSelectedTextAttribute) as String?,
-           !selected.isEmpty {
-            return selected
-        }
-        DebugLog.log("AXSelectedText empty or unavailable")
-        return nil
-    }
-
-    private func pressCopyMenuItem(in application: NSRunningApplication) -> Bool {
-        let appElement = AXUIElementCreateApplication(application.processIdentifier)
-        guard let menuBar = axAttribute(appElement, kAXMenuBarAttribute) as AXUIElement? else {
-            DebugLog.log("AX menu bar unavailable")
-            return false
-        }
-        if let exact = findMenuItem(in: menuBar, titleMatches: ["Copy", "Copiar"], maxDepth: 6),
-           isAXEnabled(exact) {
-            let result = AXUIElementPerformAction(exact, kAXPressAction as CFString)
-            DebugLog.log("AX press Copy title result=\(result.rawValue)")
-            return result == .success
-        }
-        if let commandC = findMenuItem(in: menuBar, commandCharacter: "C", maxDepth: 6),
-           isAXEnabled(commandC) {
-            let result = AXUIElementPerformAction(commandC, kAXPressAction as CFString)
-            DebugLog.log("AX press Copy command result=\(result.rawValue)")
-            return result == .success
-        }
-        DebugLog.log("AX copy menu item not found/enabled")
-        return false
-    }
-
-    private func findMenuItem(in element: AXUIElement, titleMatches titles: Set<String>, maxDepth: Int) -> AXUIElement? {
-        guard maxDepth >= 0 else { return nil }
-        if let title = axAttribute(element, kAXTitleAttribute) as String?,
-           titles.contains(title) {
-            return element
-        }
-        for child in axChildren(of: element) {
-            if let found = findMenuItem(in: child, titleMatches: titles, maxDepth: maxDepth - 1) {
-                return found
-            }
-        }
-        return nil
-    }
-
-    private func findMenuItem(in element: AXUIElement, commandCharacter: String, maxDepth: Int) -> AXUIElement? {
-        guard maxDepth >= 0 else { return nil }
-        if let command = axAttribute(element, kAXMenuItemCmdCharAttribute) as String?,
-           command.caseInsensitiveCompare(commandCharacter) == .orderedSame {
-            return element
-        }
-        for child in axChildren(of: element) {
-            if let found = findMenuItem(in: child, commandCharacter: commandCharacter, maxDepth: maxDepth - 1) {
-                return found
-            }
-        }
-        return nil
-    }
-
-    private func axChildren(of element: AXUIElement) -> [AXUIElement] {
-        guard let children = axAttribute(element, kAXChildrenAttribute) as [AXUIElement]? else { return [] }
-        return children
-    }
-
-    private func isAXEnabled(_ element: AXUIElement) -> Bool {
-        (axAttribute(element, kAXEnabledAttribute) as Bool?) ?? true
-    }
-
-    private func axAttribute<T>(_ element: AXUIElement, _ attribute: String) -> T? {
-        var value: CFTypeRef?
-        let result = AXUIElementCopyAttributeValue(element, attribute as CFString, &value)
-        guard result == .success, let value else { return nil }
-        return value as? T
-    }
-
-    private struct ImportPollContext {
-        let originalClipboard: ClipboardService.Snapshot
-        let marker: String
-        let markerChangeCount: Int
-        let sourceName: String
-        let trustedForAccessibility: Bool
-        let deadline: Date
-    }
-
-    private func completeSelectionImportWhenClipboardChanges(_ ctx: ImportPollContext) {
-        let pasteboard = NSPasteboard.general
-        let imported = pasteboard.string(forType: .string) ?? ""
-        let isMarker = imported.hasPrefix("__RETYP_AIR_IMPORT_EMPTY_")
-        let changed = pasteboard.changeCount != ctx.markerChangeCount || !isMarker
-        DebugLog.log("clipboard poll changed=\(changed) changeCount=\(pasteboard.changeCount) markerChangeCount=\(ctx.markerChangeCount) importedLen=\(imported.count)")
-
-        if !changed, Date() < ctx.deadline {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
-                self?.completeSelectionImportWhenClipboardChanges(ctx)
-            }
-            return
-        }
-
-        ClipboardService.restore(ctx.originalClipboard)
-        let text = imported.trimmingCharacters(in: .newlines)
-        guard changed, !text.isEmpty, !isMarker else {
-            DebugLog.log("import failed: clipboard did not contain selected text")
-            showPanel()
-            let permissionHint = ctx.trustedForAccessibility ? "" : " Grant Accessibility permission to Retypo Air, then try again."
-            state?.status = "No selected text imported.\(permissionHint)"
-            return
-        }
-
-        DebugLog.log("import success via clipboard length=\(imported.count)")
-        let needsConfirmation = state?.receiveExternalImport(imported, source: ctx.sourceName) ?? false
-        showPanel()
-        if needsConfirmation { auxiliaryPanels?.setImportPromptVisible(true) }
-    }
-
     private func positionPanelForActiveScreenIfNeeded() {
         guard state?.settings.followActiveScreenOnShow == true, let panel else { return }
         let screen = screenForCurrentMouse() ?? panel.screen ?? NSScreen.main
@@ -322,7 +121,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return NSScreen.screens.first { NSMouseInRect(point, $0.frame, false) }
     }
 
-    private func focusEditorIfPossible() {
+    func focusEditorIfPossible() {
         guard state?.showSettings != true, panel?.isVisible == true else { return }
         guard let editor = panel?.contentView?.firstSubview(of: KeyHandlingTextView.self) else { return }
         panel?.makeFirstResponder(editor)
