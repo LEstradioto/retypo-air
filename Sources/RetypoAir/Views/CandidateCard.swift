@@ -6,9 +6,16 @@ struct CandidateCard: View {
     var select: () -> Void
     var apply: () -> Void
 
+    private var isFreeform: Bool { candidate.action.id == EditAction.freeformID }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
+                if isFreeform {
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(Color.accentColor.opacity(0.95))
+                }
                 Text(candidate.action.title)
                     .font(.system(size: 12, weight: .semibold, design: .rounded))
                     .lineLimit(1)
@@ -37,10 +44,22 @@ struct CandidateCard: View {
             .font(.system(size: 11, weight: .semibold, design: .rounded))
         }
         .padding(10)
-        .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(selected ? Color.accentColor.opacity(0.15) : Color.white.opacity(0.08)))
-        .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(selected ? Color.accentColor.opacity(0.55) : Color.white.opacity(0.12), lineWidth: 1))
+        .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(cardFill))
+        .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(cardStroke, lineWidth: 1))
         .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         .onTapGesture { select() }
         .pointingCursor()
+    }
+
+    private var cardFill: Color {
+        if selected { return Color.accentColor.opacity(0.15) }
+        if isFreeform { return Color.accentColor.opacity(0.10) }
+        return Color.white.opacity(0.08)
+    }
+
+    private var cardStroke: Color {
+        if selected { return Color.accentColor.opacity(0.55) }
+        if isFreeform { return Color.accentColor.opacity(0.30) }
+        return Color.white.opacity(0.12)
     }
 }

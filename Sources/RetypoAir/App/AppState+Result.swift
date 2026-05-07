@@ -9,7 +9,7 @@ extension AppState {
         diffText = DiffService.compactDiff(original: outcome.original, corrected: text)
         wordsChangedLast = InlineDiffService.changedWordCount(original: outcome.original, corrected: text)
         let costUSD = cost.recordUsage(provider: settings.provider, model: selectedModel ?? "", usage: outcome.response.usage)
-        appendHistory(HistoryDraft(original: outcome.original, output: text, diff: diffText, action: outcome.action, usage: outcome.response.usage, costUSD: costUSD))
+        appendHistory(HistoryDraft(original: outcome.original, output: text, diff: diffText, action: outcome.action, instruction: outcome.instruction, usage: outcome.response.usage, costUSD: costUSD))
         cost.appendLedgerEntry(provider: settings.provider, model: selectedModel ?? "", usage: outcome.response.usage, costUSD: costUSD)
         if settings.editorLayout == .inline {
             applyInlineSubstitution(original: outcome.original, text: text)
@@ -33,26 +33,22 @@ extension AppState {
         }
     }
 
-    func appendCandidate(output: String, original: String, response: LLMResponse, action: EditAction) {
-        let costUSD = cost.computeCost(provider: settings.provider, model: selectedModel ?? "", usage: response.usage)
-        let diff = DiffService.compactDiff(original: original, corrected: output)
-        candidateResults.append(CandidateResult(action: action, output: output, diff: diff, usage: response.usage, costUSD: costUSD))
-        appendHistory(HistoryDraft(original: original, output: output, diff: diff, action: action, usage: response.usage, costUSD: costUSD))
-        cost.appendLedgerEntry(provider: settings.provider, model: selectedModel ?? "", usage: response.usage, costUSD: costUSD)
+    func appendCandidate(_ outcome: ActionOutcome) {
+        let costUSD = cost.computeCost(provider: settings.provider, model: selectedModel ?? "", usage: outcome.response.usage)
+        let diff = DiffService.compactDiff(original: outcome.original, corrected: outcome.text)
+        candidateResults.append(CandidateResult(action: outcome.action, output: outcome.text, diff: diff, usage: outcome.response.usage, costUSD: costUSD))
+        appendHistory(HistoryDraft(original: outcome.original, output: outcome.text, diff: diff, action: outcome.action, instruction: outcome.instruction, usage: outcome.response.usage, costUSD: costUSD))
+        cost.appendLedgerEntry(provider: settings.provider, model: selectedModel ?? "", usage: outcome.response.usage, costUSD: costUSD)
     }
 
     func appendHistory(_ draft: HistoryDraft) {
         guard let model = selectedModel else { return }
         let entry = HistoryEntry(
-            provider: settings.provider,
-            model: model,
-            actionID: draft.action.id,
-            actionTitle: draft.action.title,
-            input: draft.original,
-            output: draft.output,
-            diff: draft.diff,
-            usage: draft.usage,
-            costUSD: draft.costUSD
+            provider: settings.provider, model: model,
+            actionID: draft.action.id, actionTitle: draft.action.title,
+            instruction: draft.instruction,
+            input: draft.original, output: draft.output, diff: draft.diff,
+            usage: draft.usage, costUSD: draft.costUSD
         )
         history.insert(entry, at: 0)
         history = Array(history.prefix(max(1, settings.historyLimit)))

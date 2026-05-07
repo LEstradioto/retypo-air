@@ -27,6 +27,11 @@ struct HistoryEntry: Identifiable, Codable, Hashable {
     var model: String
     var actionID: String
     var actionTitle: String
+    /// The system prompt actually sent to the LLM. For static modes this
+    /// matches the action's instruction; for Freeform it's whatever the
+    /// user typed at run-time. Optional for backward-compat with older
+    /// history.json files written before this field existed.
+    var instruction: String?
     var input: String
     var output: String
     var diff: String

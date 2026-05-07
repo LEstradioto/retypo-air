@@ -46,25 +46,47 @@ extension SettingsView {
 
     private func historyRow(_ entry: HistoryEntry) -> some View {
         HStack(spacing: 10) {
-            VStack(alignment: .leading, spacing: 4) {
+            historyRowContent(entry)
+            Spacer()
+            historyRowRestoreButton(entry)
+        }
+    }
+
+    private func historyRowContent(_ entry: HistoryEntry) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 6) {
+                if entry.actionID == EditAction.freeformID {
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 9, weight: .semibold))
+                        .foregroundStyle(Color.accentColor.opacity(0.9))
+                }
                 Text("\(entry.actionTitle) · \(entry.model)")
                     .font(.system(size: 12, weight: .semibold, design: .monospaced))
                     .lineLimit(1)
-                Text(historyDisplayMode.text(for: entry))
-                    .font(.system(size: 12, weight: .regular, design: historyDisplayMode == .diff ? .monospaced : .default))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(2)
             }
-            Spacer()
-            Button { state.restoreHistory(entry, useOutput: historyDisplayMode == .output) } label: {
-                Image(systemName: "arrow.uturn.backward")
+            if let instruction = entry.instruction, !instruction.isEmpty {
+                Text("“\(instruction)”")
+                    .font(.system(size: 11, weight: .regular, design: .monospaced))
+                    .foregroundStyle(.tertiary)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
             }
-            .buttonStyle(SettingsIconButtonStyle())
-            .settingsFocus(historyFocusID(entry.id), radius: 13, keyboardFocusable: true, activate: {
-                state.restoreHistory(entry, useOutput: historyDisplayMode == .output)
-                return true
-            })
+            Text(historyDisplayMode.text(for: entry))
+                .font(.system(size: 12, weight: .regular, design: historyDisplayMode == .diff ? .monospaced : .default))
+                .foregroundStyle(.secondary)
+                .lineLimit(2)
         }
+    }
+
+    private func historyRowRestoreButton(_ entry: HistoryEntry) -> some View {
+        Button { state.restoreHistory(entry, useOutput: historyDisplayMode == .output) } label: {
+            Image(systemName: "arrow.uturn.backward")
+        }
+        .buttonStyle(SettingsIconButtonStyle())
+        .settingsFocus(historyFocusID(entry.id), radius: 13, keyboardFocusable: true, activate: {
+            state.restoreHistory(entry, useOutput: historyDisplayMode == .output)
+            return true
+        })
     }
 
     private func draftRow(_ snapshot: DraftSnapshot) -> some View {

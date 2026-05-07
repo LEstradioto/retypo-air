@@ -7,6 +7,7 @@ extension AppState {
         let changed: Bool
         let response: LLMResponse
         let action: EditAction
+        let instruction: String
     }
 
     struct HistoryDraft {
@@ -14,6 +15,7 @@ extension AppState {
         let output: String
         let diff: String
         let action: EditAction
+        let instruction: String
         let usage: TokenUsage
         let costUSD: Double?
     }
@@ -28,7 +30,7 @@ extension AppState {
             let response = try await llm.router.complete(correctionRequest(model: context.model, original: context.original))
             guard context.generation == llm.generation else { return }
             let parsed = parseCorrection(response.text) ?? (response.text.trimmingCharacters(in: .whitespacesAndNewlines), true, 0.5)
-            applyResult(ActionOutcome(text: parsed.corrected, original: context.original, changed: parsed.changed, response: response, action: currentAction))
+            applyResult(ActionOutcome(text: parsed.corrected, original: context.original, changed: parsed.changed, response: response, action: currentAction, instruction: PromptTemplates.correctionSystem))
         } catch {
             guard context.generation == llm.generation else { return }
             status = error.localizedDescription
@@ -43,7 +45,9 @@ extension AppState {
         }
         if action.id == EditAction.freeformID {
             // Freeform always routes through the prompt panel — let the user
-            // type/edit the instruction before the request fires.
+            // type/edit the instruction before the request fires. Bump the
+            // show-ID so the text field re-focuses each time.
+            freeformPromptShowID &+= 1
             host?.setFreeformPromptVisible(true)
             return
         }
@@ -62,7 +66,7 @@ extension AppState {
             let response = try await llm.router.complete(editRequest(instruction: instruction, model: context.model, original: context.original))
             guard context.generation == llm.generation else { return }
             let text = response.text.trimmingCharacters(in: .whitespacesAndNewlines)
-            applyResult(ActionOutcome(text: text, original: context.original, changed: text != context.original, response: response, action: action))
+            applyResult(ActionOutcome(text: text, original: context.original, changed: text != context.original, response: response, action: action, instruction: instruction))
         } catch {
             guard context.generation == llm.generation else { return }
             status = error.localizedDescription
@@ -111,11 +115,12 @@ extension AppState {
             if action.id == "correct" {
                 let response = try await llm.router.complete(correctionRequest(model: model, original: original))
                 let parsed = parseCorrection(response.text) ?? (response.text.trimmingCharacters(in: .whitespacesAndNewlines), true, 0.5)
-                appendCandidate(output: parsed.corrected, original: original, response: response, action: action)
+                appendCandidate(ActionOutcome(text: parsed.corrected, original: original, changed: parsed.changed, response: response, action: action, instruction: PromptTemplates.correctionSystem))
             } else {
                 guard let instruction = resolvedInstruction(for: action) else { return }
                 let response = try await llm.router.complete(editRequest(instruction: instruction, model: model, original: original))
-                appendCandidate(output: response.text.trimmingCharacters(in: .whitespacesAndNewlines), original: original, response: response, action: action)
+                let text = response.text.trimmingCharacters(in: .whitespacesAndNewlines)
+                appendCandidate(ActionOutcome(text: text, original: original, changed: text != original, response: response, action: action, instruction: instruction))
             }
         } catch {
             status = error.localizedDescription

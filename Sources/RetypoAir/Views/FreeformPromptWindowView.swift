@@ -20,7 +20,16 @@ struct FreeformPromptWindowView: View {
         }
         .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(Color.accentColor.opacity(0.24), lineWidth: 1))
-        .onAppear { fieldFocused = true }
+        .onAppear { focusField() }
+        .onChange(of: state.freeformPromptShowID) { _ in focusField() }
+    }
+
+    private func focusField() {
+        // Two ticks: NSPanel needs to settle before SwiftUI focus takes.
+        DispatchQueue.main.async {
+            fieldFocused = true
+            DispatchQueue.main.async { fieldFocused = true }
+        }
     }
 
     private var content: some View {

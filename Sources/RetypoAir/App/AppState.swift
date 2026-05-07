@@ -30,6 +30,11 @@ final class AppState: ObservableObject {
     /// Live instruction text for the Freeform mode. Populated only while
     /// the user has Freeform selected; sent as the system instruction at run.
     @Published var freeformInstruction: String = ""
+    /// Incremented on every Freeform-prompt open. The view watches this
+    /// counter to re-fire focus into the text field on subsequent shows
+    /// (SwiftUI's `@FocusState` won't auto-refocus by itself when the
+    /// containing panel is just orderFront'd again).
+    @Published var freeformPromptShowID: Int = 0
 
     let cost: CostTracker
     let llm = LLMSession()
