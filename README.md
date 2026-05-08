@@ -1,8 +1,10 @@
+![Retypo Air](retypoair.webp)
+
 # Retypo Air
 
 Tiny macOS floating textbox. Run saved prompts on selected text (from any app or manual input), auto-copy the result.
 
-![Retypo Air glass panel docked at the bottom of the screen, showing inline diff highlights over a TextEdit document.](glass-bottom-1-main.png)
+![Retypo Air glass panel docked at the bottom of the screen, showing inline diff highlights over a TextEdit document.](glass-bottom-1-main.webp)
 
 > [!IMPORTANT]
 > Personal, opinionated, 100% AI-assisted. Use at your own risk.
