@@ -71,13 +71,16 @@ extension AppDelegate {
         let marker = primeClipboardMarker()
         if trustedForAccessibility, pressCopyMenuItem(in: sourceApplication) {
             DebugLog.log("copy menu pressed via AX")
+            // Show the panel immediately. Clipboard poll runs in the background
+            // and fills the editor when the source app's Copy completes.
+            showPanel()
             completeSelectionImportWhenClipboardChanges(ImportPollContext(
                 originalClipboard: snapshot,
                 marker: marker.text,
                 markerChangeCount: marker.changeCount,
                 sourceName: sourceName,
                 trustedForAccessibility: trustedForAccessibility,
-                deadline: Date().addingTimeInterval(0.9)
+                deadline: Date().addingTimeInterval(0.4)
             ))
         } else {
             DebugLog.log("copy menu unavailable; not sending synthetic cmd+c to avoid leaking literal c")
