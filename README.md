@@ -121,3 +121,7 @@ bin/quality          # run all gates
 bin/quality-bump     # ratchet baseline lower after improvements
 swift test           # tests only
 ```
+
+## License
+
+Apache License 2.0. See [LICENSE](LICENSE).
