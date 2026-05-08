@@ -100,7 +100,7 @@ extension AppDelegate {
         DebugLog.log("import failed: clipboard did not contain selected text")
         if importOriginalClipboard(ctx) { return }
         showPanel()
-        state?.status = "No selected text or prompt imported.\(vscodeDisabledHint(ctx.source))\(accessibilityHint(ctx.source))"
+        state?.status = "No selected text or prompt imported.\(terminalDisabledHint(ctx.source))\(vscodeDisabledHint(ctx.source))\(accessibilityHint(ctx.source))"
     }
 
     private func importOriginalClipboard(_ ctx: ImportPollContext) -> Bool {
@@ -116,7 +116,7 @@ extension AppDelegate {
 
     private func unavailableCopyMenuStatus(_ source: ImportSourceContext) -> String {
         guard source.trustedForAccessibility else { return "Grant Accessibility permission to import selection" }
-        return "No selected text or prompt imported.\(vscodeDisabledHint(source))"
+        return "No selected text or prompt imported.\(terminalDisabledHint(source))\(vscodeDisabledHint(source))"
     }
 
     private func accessibilityHint(_ source: ImportSourceContext) -> String {
@@ -124,10 +124,16 @@ extension AppDelegate {
     }
 
     private func vscodeDisabledHint(_ source: ImportSourceContext) -> String {
-        let enabled = state?.settings.experimentalVSCodeAccessibleViewImport == true
+        let enabled = state?.settings.experimentalVSCodeAccessibleViewImport ?? true
         let policy = VSCodePromptImportPolicy(enabled: enabled)
         guard !policy.shouldTryAccessibleView(bundleIdentifier: source.bundleID),
               VSCodePromptImportPolicy.isVSCodeBundleIdentifier(source.bundleID) else { return "" }
         return VSCodePromptImportPolicy.disabledHint
+    }
+
+    private func terminalDisabledHint(_ source: ImportSourceContext) -> String {
+        let enabled = state?.settings.terminalPromptImportEnabled ?? true
+        guard !enabled, !VSCodePromptImportPolicy.isVSCodeBundleIdentifier(source.bundleID) else { return "" }
+        return " Terminal prompt import is disabled in Settings."
     }
 }

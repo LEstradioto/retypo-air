@@ -2,13 +2,30 @@ import XCTest
 @testable import RetypoAir
 
 final class RetypoSettingsTests: XCTestCase {
-    func testExperimentalVSCodeAccessibleViewDefaultsToFalse() {
-        XCTAssertFalse(RetypoSettings().experimentalVSCodeAccessibleViewImport)
+    func testTerminalPromptImportDefaultsToTrue() {
+        XCTAssertTrue(RetypoSettings().terminalPromptImportEnabled)
     }
 
-    func testExperimentalVSCodeAccessibleViewDecodesWhenExplicitlyEnabled() throws {
-        let data = Data(#"{"experimentalVSCodeAccessibleViewImport":true}"#.utf8)
-        let settings = try JSONDecoder().decode(RetypoSettings.self, from: data)
+    func testMissingImportSettingsDecodeToEnabledDefaults() throws {
+        let settings = try JSONDecoder().decode(RetypoSettings.self, from: Data("{}".utf8))
+
+        XCTAssertTrue(settings.terminalPromptImportEnabled)
         XCTAssertTrue(settings.experimentalVSCodeAccessibleViewImport)
+    }
+
+    func testTerminalPromptImportDecodesWhenExplicitlyDisabled() throws {
+        let data = Data(#"{"terminalPromptImportEnabled":false}"#.utf8)
+        let settings = try JSONDecoder().decode(RetypoSettings.self, from: data)
+        XCTAssertFalse(settings.terminalPromptImportEnabled)
+    }
+
+    func testExperimentalVSCodeAccessibleViewDefaultsToTrue() {
+        XCTAssertTrue(RetypoSettings().experimentalVSCodeAccessibleViewImport)
+    }
+
+    func testExperimentalVSCodeAccessibleViewDecodesWhenExplicitlyDisabled() throws {
+        let data = Data(#"{"experimentalVSCodeAccessibleViewImport":false}"#.utf8)
+        let settings = try JSONDecoder().decode(RetypoSettings.self, from: data)
+        XCTAssertFalse(settings.experimentalVSCodeAccessibleViewImport)
     }
 }

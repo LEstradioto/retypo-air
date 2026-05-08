@@ -87,11 +87,16 @@ extension SettingsView {
     var terminalImportSection: some View {
         SettingsCard(title: "Terminal import") {
             settingToggle(
+                "Claude/Codex prompt import",
+                focusID: "terminal.promptImport",
+                keyPath: \.terminalPromptImportEnabled
+            )
+            settingToggle(
                 "Experimental VS Code prompt import",
                 focusID: "terminal.vscodeAccessibleView",
                 keyPath: \.experimentalVSCodeAccessibleViewImport
             )
-            Text("Uses VS Code Accessible View by briefly sending Option+F2, reading the prompt, then pressing Esc.")
+            Text("Claude/Codex import reads the terminal buffer. VS Code import briefly sends Option+F2, reads Accessible View, then presses Esc.")
                 .font(.system(size: 11, weight: .medium))
                 .foregroundStyle(.secondary)
         }

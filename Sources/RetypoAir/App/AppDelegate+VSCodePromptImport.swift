@@ -3,7 +3,7 @@ import Carbon
 
 extension AppDelegate {
     func promptViaVSCodeAccessibleView(from application: NSRunningApplication) -> PromptCaptureCandidate? {
-        let enabled = state?.settings.experimentalVSCodeAccessibleViewImport == true
+        let enabled = state?.settings.experimentalVSCodeAccessibleViewImport ?? true
         let policy = VSCodePromptImportPolicy(enabled: enabled)
         guard policy.shouldTryAccessibleView(bundleIdentifier: application.bundleIdentifier) else {
             logVSCodeAccessibleViewSkip(application)

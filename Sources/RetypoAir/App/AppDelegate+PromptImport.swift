@@ -2,7 +2,8 @@ import AppKit
 
 extension AppDelegate {
     func importVisibleTerminalPrompt(application: NSRunningApplication, sourceName: String) -> Bool {
-        if let prompt = promptViaAccessibilityTextBuffer(from: application) {
+        let terminalImportEnabled = state?.settings.terminalPromptImportEnabled ?? true
+        if terminalImportEnabled, let prompt = promptViaAccessibilityTextBuffer(from: application) {
             return importTerminalPrompt(prompt, sourceName: sourceName)
         }
         guard let prompt = promptViaVSCodeAccessibleView(from: application) else { return false }

@@ -74,7 +74,8 @@ struct RetypoSettings: Codable, Equatable {
     var previousModelShortcut: String = "cmd+opt+["
     var followActiveScreenOnShow: Bool = true
     var historyLimit: Int = 10
-    var experimentalVSCodeAccessibleViewImport: Bool = false
+    var terminalPromptImportEnabled: Bool = true
+    var experimentalVSCodeAccessibleViewImport: Bool = true
 
     init() {}
 
@@ -88,7 +89,7 @@ struct RetypoSettings: Codable, Equatable {
     }
 
     enum CodingKeys: String, CodingKey {
-        case provider, modelByProvider, autoCorrect, autoCopy, debounceMs, alwaysOnTop, hideAfterCopy, enterToCorrect, nativeSpellcheck, panelFrame, currentActionID, editorLayout, mainTheme, shortcutByAction, shortcutByModel, acceptedModelIDsByProvider, nextModelShortcut, previousModelShortcut, followActiveScreenOnShow, historyLimit, experimentalVSCodeAccessibleViewImport
+        case provider, modelByProvider, autoCorrect, autoCopy, debounceMs, alwaysOnTop, hideAfterCopy, enterToCorrect, nativeSpellcheck, panelFrame, currentActionID, editorLayout, mainTheme, shortcutByAction, shortcutByModel, acceptedModelIDsByProvider, nextModelShortcut, previousModelShortcut, followActiveScreenOnShow, historyLimit, terminalPromptImportEnabled, experimentalVSCodeAccessibleViewImport
     }
 
     init(from decoder: Decoder) throws {
@@ -116,6 +117,7 @@ struct RetypoSettings: Codable, Equatable {
         previousModelShortcut = try container.decodeIfPresent(String.self, forKey: .previousModelShortcut) ?? previousModelShortcut
         followActiveScreenOnShow = try container.decodeIfPresent(Bool.self, forKey: .followActiveScreenOnShow) ?? followActiveScreenOnShow
         historyLimit = try container.decodeIfPresent(Int.self, forKey: .historyLimit) ?? historyLimit
+        terminalPromptImportEnabled = try container.decodeIfPresent(Bool.self, forKey: .terminalPromptImportEnabled) ?? terminalPromptImportEnabled
         experimentalVSCodeAccessibleViewImport = try container.decodeIfPresent(Bool.self, forKey: .experimentalVSCodeAccessibleViewImport) ?? experimentalVSCodeAccessibleViewImport
     }
 }

@@ -21,8 +21,8 @@ Other reason: typing long prompts into CLI agents like Codex or Claude Code, the
 
 - macOS 13+, Swift 5.9+, Xcode CLT or Xcode.
 - Selection import (`Cmd+Shift+Space` from another app) needs Accessibility permission. Grant once when prompted; pick `build-dev/RetypoAir-dev.app`.
-- Terminal prompt import for Codex/Claude Code uses the terminal's accessible text buffer.
-- VS Code integrated terminal import is experimental and opt-in in Settings. It briefly opens VS Code Accessible View with `Option+F2`, reads the buffer through Accessibility, then presses `Esc`.
+- Terminal prompt import for Codex/Claude Code uses the terminal's accessible text buffer and is on by default.
+- VS Code integrated terminal import is experimental and on by default in Settings. It briefly opens VS Code Accessible View with `Option+F2`, reads the buffer through Accessibility, then presses `Esc`.
 - BYO API key. One of Groq, Anthropic, OpenAI, OpenRouter.
 
 ## Quick start
@@ -70,7 +70,7 @@ When `Cmd+Shift+Space` from another app:
 
 1. **AX selection**. Fast, no clipboard touched. Native macOS apps.
 2. **Accessible terminal buffer**. Parses the focused terminal's visible text for Claude/Codex composer semantics.
-3. **Experimental VS Code Accessible View**. Disabled by default (`experimentalVSCodeAccessibleViewImport` in `settings.json` or Settings UI). Sends `Option+F2`, reads the Accessible View, then sends `Esc`.
+3. **Experimental VS Code Accessible View**. Enabled by default (`experimentalVSCodeAccessibleViewImport` in `settings.json` or Settings UI). Sends `Option+F2`, reads the Accessible View, then sends `Esc`.
 4. **Synthetic `Cmd+C`** via AX-pressed Copy menu. Clipboard read then restored. Terminals, TUIs.
 5. **Existing clipboard**. Whatever was already copied.
 

@@ -60,6 +60,7 @@ struct SettingsView: View {
             "editor.followScreen",
             "editor.nativeSpellcheck",
             "editor.debounce",
+            "terminal.promptImport",
             "terminal.vscodeAccessibleView",
             "shortcuts.previousModel",
             "shortcuts.nextModel"
