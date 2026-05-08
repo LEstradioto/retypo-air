@@ -1,48 +1,49 @@
 import AppKit
 
 extension AppDelegate {
-    struct ImportPollContext {
-        let originalClipboard: ClipboardService.Snapshot
-        let marker: String
-        let markerChangeCount: Int
-        let sourceName: String
+    struct ImportSourceContext {
+        let application: NSRunningApplication
+        let name: String
+        let bundleID: String?
         let trustedForAccessibility: Bool
-        let deadline: Date
     }
 
     func importSelectedTextFromFrontmostApp(allowClipboardFallback: Bool) {
         DebugLog.log("import begin nsAppActive=\(NSApp.isActive)")
-        guard let sourceApplication = resolveExternalSource() else { return }
-        previousApplication = sourceApplication
-        let sourceName = sourceApplication.localizedName ?? "frontmost app"
-        DebugLog.log("import source name=\(sourceName) bundle=\(sourceApplication.bundleIdentifier ?? "nil") pid=\(sourceApplication.processIdentifier)")
-        let trusted = requestAccessibilityTrustIfNeeded()
-        DebugLog.log("accessibility trusted=\(trusted)")
-        // Priority 1: live AX selection — no clipboard touched.
-        if trusted, importViaAXSelectedText(application: sourceApplication, sourceName: sourceName) { return }
+        guard let source = importSourceContext() else { return }
+        if importImmediateSourceText(source) { return }
         guard allowClipboardFallback else {
-            if importExistingClipboard(sourceName: sourceName) { return }
-            showPanel()
-            state?.status = "No selected text imported"
+            finishImportWithoutClipboardFallback(sourceName: source.name)
             return
         }
-        // Priority 2: synthetic Cmd+C via AX-pressed Copy menu (terminals etc.).
-        // Falls through to Priority 3 (existing clipboard) on failure inside `failImport`.
-        startClipboardPoll(sourceApplication: sourceApplication, sourceName: sourceName, trustedForAccessibility: trusted)
+        startClipboardPoll(source: source)
     }
 
-    /// Priority 3 fallback: import whatever the user already has on the
-    /// system clipboard. Returns true if anything was imported.
-    private func importExistingClipboard(sourceName: String) -> Bool {
-        let snapshot = ClipboardService.snapshot()
-        guard let text = snapshot.string?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty else {
-            return false
-        }
-        DebugLog.log("import fallback: using existing clipboard length=\(text.count)")
-        let needsConfirmation = state?.receiveExternalImport(text, source: "\(sourceName) (clipboard)") ?? false
+    private func importSourceContext() -> ImportSourceContext? {
+        guard let application = resolveExternalSource() else { return nil }
+        previousApplication = application
+        let sourceName = application.localizedName ?? "frontmost app"
+        let bundleID = application.bundleIdentifier
+        logImportSource(application, sourceName: sourceName, bundleID: bundleID)
+        let trusted = requestAccessibilityTrustIfNeeded()
+        DebugLog.log("accessibility trusted=\(trusted)")
+        return ImportSourceContext(application: application, name: sourceName, bundleID: bundleID, trustedForAccessibility: trusted)
+    }
+
+    private func importImmediateSourceText(_ source: ImportSourceContext) -> Bool {
+        if source.trustedForAccessibility,
+           importViaAXSelectedText(application: source.application, sourceName: source.name) { return true }
+        return importVisibleTerminalPrompt(application: source.application, sourceName: source.name)
+    }
+
+    private func logImportSource(_ application: NSRunningApplication, sourceName: String, bundleID: String?) {
+        DebugLog.log("import source name=\(sourceName) bundle=\(bundleID ?? "nil") pid=\(application.processIdentifier)")
+    }
+
+    private func finishImportWithoutClipboardFallback(sourceName: String) {
+        if importExistingClipboard(sourceName: sourceName) { return }
         showPanel()
-        if needsConfirmation { auxiliaryPanels?.setImportPromptVisible(true) }
-        return true
+        state?.status = "No selected text or prompt imported"
     }
 
     private func resolveExternalSource() -> NSRunningApplication? {
@@ -66,84 +67,10 @@ extension AppDelegate {
         return true
     }
 
-    private func startClipboardPoll(sourceApplication: NSRunningApplication, sourceName: String, trustedForAccessibility: Bool) {
-        let snapshot = ClipboardService.snapshot()
-        let marker = primeClipboardMarker()
-        if trustedForAccessibility, pressCopyMenuItem(in: sourceApplication) {
-            DebugLog.log("copy menu pressed via AX")
-            showPanel()
-            completeSelectionImportWhenClipboardChanges(ImportPollContext(
-                originalClipboard: snapshot,
-                marker: marker.text,
-                markerChangeCount: marker.changeCount,
-                sourceName: sourceName,
-                trustedForAccessibility: trustedForAccessibility,
-                deadline: Date().addingTimeInterval(0.4)
-            ))
-        } else {
-            DebugLog.log("copy menu unavailable; not sending synthetic cmd+c to avoid leaking literal c")
-            ClipboardService.restore(snapshot)
-            showPanel()
-            state?.status = trustedForAccessibility ? "No selected text imported" : "Grant Accessibility permission to import selection"
-        }
-    }
-
-    private func primeClipboardMarker() -> (text: String, changeCount: Int) {
-        let pasteboard = NSPasteboard.general
-        let marker = "__RETYP_AIR_IMPORT_EMPTY_\(UUID().uuidString)__"
-        pasteboard.clearContents()
-        pasteboard.setString(marker, forType: .string)
-        return (marker, pasteboard.changeCount)
-    }
-
     func rememberPreviousApplication() {
         let current = NSWorkspace.shared.frontmostApplication
         if current?.processIdentifier != NSRunningApplication.current.processIdentifier {
             previousApplication = current
         }
-    }
-
-    private func completeSelectionImportWhenClipboardChanges(_ ctx: ImportPollContext) {
-        let pasteboard = NSPasteboard.general
-        let imported = pasteboard.string(forType: .string) ?? ""
-        let isMarker = imported.hasPrefix("__RETYP_AIR_IMPORT_EMPTY_")
-        let changed = pasteboard.changeCount != ctx.markerChangeCount || !isMarker
-        DebugLog.log("clipboard poll changed=\(changed) changeCount=\(pasteboard.changeCount) markerChangeCount=\(ctx.markerChangeCount) importedLen=\(imported.count)")
-        if !changed, Date() < ctx.deadline {
-            scheduleClipboardPoll(ctx)
-            return
-        }
-        ClipboardService.restore(ctx.originalClipboard)
-        let text = imported.trimmingCharacters(in: .newlines)
-        guard changed, !text.isEmpty, !isMarker else {
-            failImport(ctx: ctx)
-            return
-        }
-        DebugLog.log("import success via clipboard length=\(imported.count)")
-        let needsConfirmation = state?.receiveExternalImport(imported, source: ctx.sourceName) ?? false
-        showPanel()
-        if needsConfirmation { auxiliaryPanels?.setImportPromptVisible(true) }
-    }
-
-    private func scheduleClipboardPoll(_ ctx: ImportPollContext) {
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
-            self?.completeSelectionImportWhenClipboardChanges(ctx)
-        }
-    }
-
-    private func failImport(ctx: ImportPollContext) {
-        DebugLog.log("import failed: clipboard did not contain selected text")
-        // Priority 3: original clipboard (snapshot taken before our synthetic
-        // copy primed the marker). Use whatever the user already had.
-        if let original = ctx.originalClipboard.string?.trimmingCharacters(in: .whitespacesAndNewlines), !original.isEmpty {
-            DebugLog.log("import fallback: using original clipboard length=\(original.count)")
-            let needsConfirmation = state?.receiveExternalImport(original, source: "\(ctx.sourceName) (clipboard)") ?? false
-            showPanel()
-            if needsConfirmation { auxiliaryPanels?.setImportPromptVisible(true) }
-            return
-        }
-        showPanel()
-        let hint = ctx.trustedForAccessibility ? "" : " Grant Accessibility permission to Retypo Air, then try again."
-        state?.status = "No selected text imported.\(hint)"
     }
 }

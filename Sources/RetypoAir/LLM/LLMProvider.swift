@@ -78,7 +78,6 @@ enum LLMError: LocalizedError {
 }
 
 protocol LLMProviderClient {
-    var kind: ProviderKind { get }
     func complete(_ request: LLMRequest, apiKey: String) async throws -> LLMResponse
     func listModels(apiKey: String) async throws -> [ProviderModel]
 }

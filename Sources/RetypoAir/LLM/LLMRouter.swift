@@ -5,9 +5,8 @@ final class LLMRouter {
 
     init() {
         providers = [
-            .groq: OpenAICompatibleProvider(kind: .groq, baseURL: URL(staticString: "https://api.groq.com/openai/v1")),
+            .groq: OpenAICompatibleProvider(baseURL: URL(staticString: "https://api.groq.com/openai/v1")),
             .openrouter: OpenAICompatibleProvider(
-                kind: .openrouter,
                 baseURL: URL(staticString: "https://openrouter.ai/api/v1"),
                 extraHeaders: [
                     "HTTP-Referer": "https://retypo-air.local",

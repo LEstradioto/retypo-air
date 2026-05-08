@@ -20,6 +20,7 @@ struct SettingsView: View {
                         VStack(spacing: 14) {
                             modelSection
                             editorSection
+                            terminalImportSection
                             accessSection
                             modeSection
                             historySection
@@ -59,6 +60,7 @@ struct SettingsView: View {
             "editor.followScreen",
             "editor.nativeSpellcheck",
             "editor.debounce",
+            "terminal.vscodeAccessibleView",
             "shortcuts.previousModel",
             "shortcuts.nextModel"
         ]

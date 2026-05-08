@@ -1,12 +1,10 @@
 import Foundation
 
 final class OpenAICompatibleProvider: LLMProviderClient {
-    let kind: ProviderKind
     private let baseURL: URL
     private let extraHeaders: [String: String]
 
-    init(kind: ProviderKind, baseURL: URL, extraHeaders: [String: String] = [:]) {
-        self.kind = kind
+    init(baseURL: URL, extraHeaders: [String: String] = [:]) {
         self.baseURL = baseURL
         self.extraHeaders = extraHeaders
     }

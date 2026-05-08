@@ -117,11 +117,6 @@ final class AppState: ObservableObject {
         return models.filter { accepted.contains($0.id) }
     }
 
-    var statusLine: String {
-        "Mode: \(currentAction.title) · Model: \(modelLabel) · \(settings.editorLayout.displayName)"
-    }
-
-
     func setSelectedModel(_ model: String, provider: ProviderKind? = nil) {
         if let provider { settings.provider = provider }
         settings.modelByProvider[settings.provider] = model

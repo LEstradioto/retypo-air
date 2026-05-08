@@ -50,7 +50,7 @@ extension AppState {
         lastAutoSubmittedHash = nil
         typingStartedAt = Date()
         DraftStore.save(inputText)
-        status = "Imported selection from \(source)"
+        status = "Imported text from \(source)"
     }
 
     func onInputChanged() {

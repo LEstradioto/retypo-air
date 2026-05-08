@@ -21,6 +21,8 @@ Other reason: typing long prompts into CLI agents like Codex or Claude Code, the
 
 - macOS 13+, Swift 5.9+, Xcode CLT or Xcode.
 - Selection import (`Cmd+Shift+Space` from another app) needs Accessibility permission. Grant once when prompted; pick `build-dev/RetypoAir-dev.app`.
+- Terminal prompt import for Codex/Claude Code uses the terminal's accessible text buffer.
+- VS Code integrated terminal import is experimental and opt-in in Settings. It briefly opens VS Code Accessible View with `Option+F2`, reads the buffer through Accessibility, then presses `Esc`.
 - BYO API key. One of Groq, Anthropic, OpenAI, OpenRouter.
 
 ## Quick start
@@ -37,6 +39,7 @@ In Settings, pick a provider and click Refresh to load its models.
 - One global shortcut. `Cmd+Shift+Space` in, edit, out.
 - Easy go-and-back: hide restores focus to the app you came from.
 - Selection import from any app.
+- Codex/Claude Code prompt import from terminal windows without manual selection.
 - 13 pre-made prompts. Freeform mode: type the prompt live each run.
 - Auto-copy and auto-correct.
 - Inline or stacked diff. Changed words underlined green.
@@ -61,13 +64,15 @@ Built-in: Correct, Typos & Grammar, Improve Writing, Translate, Simplify, Summar
 
 Edit, rename, disable, shortcut-bind in Settings. Stored in `~/.retypo-air/modes.json`.
 
-## Selection import precedence
+## External import precedence
 
 When `Cmd+Shift+Space` from another app:
 
 1. **AX selection**. Fast, no clipboard touched. Native macOS apps.
-2. **Synthetic `Cmd+C`** via AX-pressed Copy menu. Clipboard read then restored. Terminals, TUIs.
-3. **Existing clipboard**. Whatever was already copied.
+2. **Accessible terminal buffer**. Parses the focused terminal's visible text for Claude/Codex composer semantics.
+3. **Experimental VS Code Accessible View**. Disabled by default (`experimentalVSCodeAccessibleViewImport` in `settings.json` or Settings UI). Sends `Option+F2`, reads the Accessible View, then sends `Esc`.
+4. **Synthetic `Cmd+C`** via AX-pressed Copy menu. Clipboard read then restored. Terminals, TUIs.
+5. **Existing clipboard**. Whatever was already copied.
 
 If a draft already exists, asks before replacing. Failures: `~/.retypo-air/import-debug.log`.
 
@@ -75,7 +80,7 @@ If a draft already exists, asks before replacing. Failures: `~/.retypo-air/impor
 
 | Shortcut | Action |
 | --- | --- |
-| `Cmd+Shift+Space` | Show/hide panel (global). From another app: also imports selection or clipboard |
+| `Cmd+Shift+Space` | Show/hide panel (global). From another app: also imports selection, visible terminal prompt, or clipboard |
 | `Cmd+Shift+Enter` | Run all enabled modes against current draft |
 | `Enter` | Run current mode, auto-copy |
 | `Shift+Enter` | New line |

@@ -84,6 +84,19 @@ extension SettingsView {
             })
     }
 
+    var terminalImportSection: some View {
+        SettingsCard(title: "Terminal import") {
+            settingToggle(
+                "Experimental VS Code prompt import",
+                focusID: "terminal.vscodeAccessibleView",
+                keyPath: \.experimentalVSCodeAccessibleViewImport
+            )
+            Text("Uses VS Code Accessible View by briefly sending Option+F2, reading the prompt, then pressing Esc.")
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(.secondary)
+        }
+    }
+
     /// Merged "shortcuts + cost" table. One row per model with columns:
     /// accept / id / shortcut / input $ per 1M / output $ per 1M.
     var accessSection: some View {

@@ -76,7 +76,7 @@ extension AppDelegate {
         return nil
     }
 
-    private func axChildren(of element: AXUIElement) -> [AXUIElement] {
+    func axChildren(of element: AXUIElement) -> [AXUIElement] {
         guard let children = axAttribute(element, kAXChildrenAttribute) as [AXUIElement]? else { return [] }
         return children
     }
@@ -85,7 +85,7 @@ extension AppDelegate {
         (axAttribute(element, kAXEnabledAttribute) as Bool?) ?? true
     }
 
-    private func axAttribute<T>(_ element: AXUIElement, _ attribute: String) -> T? {
+    func axAttribute<T>(_ element: AXUIElement, _ attribute: String) -> T? {
         var value: CFTypeRef?
         let result = AXUIElementCopyAttributeValue(element, attribute as CFString, &value)
         guard result == .success, let value else { return nil }
