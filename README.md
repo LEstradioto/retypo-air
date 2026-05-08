@@ -1,6 +1,4 @@
-![Retypo Air](/assets/AppIcon.png)
-
-# Retypo Air
+# Retypo Air ![Retypo Air](assets/bubble-128.png) 
 
 ![Retypo Air glass panel docked at the bottom of the screen, showing inline diff highlights over a TextEdit document.](glass-bottom-1-main.webp)
 
